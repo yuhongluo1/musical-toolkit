@@ -669,6 +669,80 @@
   </div>
 </div>
 
+<!-- MIC EDITOR MODAL -->
+<div class="mo" id="micEditorMo">
+  <div class="md" style="max-width:520px;">
+    <h3 id="meTitle">编辑麦克风</h3>
+    <div class="fr">
+      <div class="fg"><label>设备编号 *</label><input id="meId" placeholder="M1"></div>
+      <div class="fg"><label>类型</label>
+        <select id="meType" style="font-size:12px;padding:6px 10px;">
+          <option value="headset">🎧 头戴</option>
+          <option value="handheld">🎤 手持</option>
+          <option value="lavalier">📎 领夹</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>品牌</label><input id="meBrand" placeholder="Shure"></div>
+      <div class="fg"><label>Channel</label><input id="meChannel" placeholder="1"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>状态</label>
+        <select id="meStatus" style="font-size:12px;padding:6px 10px;">
+          <option value="ok">✅ 正常</option>
+          <option value="broken">❌ 故障</option>
+        </select>
+      </div>
+      <div class="fg"><label>备注</label><input id="meNotes" placeholder="如：音量偏小"></div>
+    </div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('micEditorMo')">取消</button>
+      <button class="btn-p" onclick="saveMic()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MIC ASSIGN MODAL -->
+<div class="mo" id="micAssignMo">
+  <div class="md" style="max-width:480px;">
+    <h3>分配麦克风</h3>
+    <div class="fg"><label>麦克风</label>
+      <select id="maMic" style="font-size:12px;padding:6px 10px;"></select>
+    </div>
+    <div class="fg"><label>演员名 *</label><input id="maActor" placeholder="小张"></div>
+    <div class="fg"><label>角色名</label><input id="maChar" placeholder="BONNIE"></div>
+    <div class="fg"><label>备注</label><input id="maNote" placeholder="如：第三句后传给小李"></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('micAssignMo')">取消</button>
+      <button class="btn-p" onclick="saveMicAssign()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUDIO CUE MODAL -->
+<div class="mo" id="audioCueMo">
+  <div class="md" style="max-width:480px;">
+    <h3>绑定音频Cue</h3>
+    <p style="color:#888;font-size:13px;margin-bottom:10px;" id="acTrackName"></p>
+    <div class="fg"><label>绑定到场景</label>
+      <select id="acScene" style="font-size:12px;padding:6px 10px;"></select>
+    </div>
+    <div class="fg"><label>偏移秒数（从头播放填 0:00）</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input id="acOffsetMin" placeholder="0" style="max-width:60px;text-align:center;"> :
+        <input id="acOffsetSec" placeholder="00" style="max-width:60px;text-align:center;">
+        <span style="color:#555;font-size:12px;">(分:秒)</span>
+      </div>
+    </div>
+    <div class="fg"><label>备注</label><input id="acNote" placeholder="如：灯光亮起时开始播放"></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('audioCueMo')">取消</button>
+      <button class="btn-p" onclick="saveAudioCue()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- PROP MANAGER MODAL -->
 <div class="mo" id="propMo">
   <div class="md" style="max-width:850px;">
@@ -2602,6 +2676,56 @@ load(); renderHome();
 //  MODULE: MICROPHONE MANAGER
 // ====================================================================
 let editingMicIdx = -1;
+let editingAssignSceneKey = '';
+let editingAudioTrackIdx = -1;
+
+function addMic() {
+  editingMicIdx = -1;
+  document.getElementById('meTitle').textContent = '添加麦克风';
+  document.getElementById('meId').value = '';
+  document.getElementById('meType').value = 'headset';
+  document.getElementById('meBrand').value = '';
+  document.getElementById('meChannel').value = '';
+  document.getElementById('meStatus').value = 'ok';
+  document.getElementById('meNotes').value = '';
+  closeMo('micMo');
+  document.getElementById('micEditorMo').classList.add('a');
+}
+
+function editMic(i) {
+  const s = gs(); const m = s.mics.inventory[i];
+  if (!m) return;
+  editingMicIdx = i;
+  document.getElementById('meTitle').textContent = '编辑麦克风';
+  document.getElementById('meId').value = m.id;
+  document.getElementById('meType').value = m.type || 'headset';
+  document.getElementById('meBrand').value = m.brand || '';
+  document.getElementById('meChannel').value = m.channel || '';
+  document.getElementById('meStatus').value = m.status || 'ok';
+  document.getElementById('meNotes').value = m.notes || '';
+  closeMo('micMo');
+  document.getElementById('micEditorMo').classList.add('a');
+}
+
+function saveMic() {
+  const s = gs(); if (!s) return;
+  const id = document.getElementById('meId').value.trim();
+  if (!id) { t('请输入设备编号'); return; }
+  const type = document.getElementById('meType').value;
+  const brand = document.getElementById('meBrand').value.trim();
+  const channel = document.getElementById('meChannel').value.trim();
+  const status = document.getElementById('meStatus').value;
+  const notes = document.getElementById('meNotes').value.trim();
+  if (!s.mics) s.mics = { inventory: [], assignments: [], quickChanges: [] };
+  if (editingMicIdx >= 0 && s.mics.inventory[editingMicIdx]) {
+    s.mics.inventory[editingMicIdx] = { id, type, brand, channel, status, notes };
+  } else {
+    s.mics.inventory.push({ id, type, brand, channel, status, notes });
+  }
+  save(); closeMo('micEditorMo');
+  document.getElementById('micMo').classList.add('a');
+  renderMicView(); t('已保存 '+id);
+}
 let micView = 'inventory';
 
 function showMicManager() {
@@ -2668,36 +2792,40 @@ function renderMicInventory() {
   document.getElementById('micContentView').innerHTML = html;
 }
 
-function addMic() {
-  const s = gs();
-  const id = prompt('设备编号（如 M1, M2…）：');
-  if (!id) return;
-  const type = prompt('类型：headset(头戴) / handheld(手持) / lavalier(领夹)', 'headset');
-  if (!type) return;
-  const brand = prompt('品牌（可选）：') || '';
-  const channel = prompt('Channel（可选）：') || '';
-  if (!s.mics) s.mics = { inventory: [], assignments: [], quickChanges: [] };
-  s.mics.inventory.push({ id, type, brand, channel, status: 'ok', notes: '' });
-  save(); renderMicView(); t('已添加 ' + id);
-}
-
-function editMic(i) {
-  const s = gs(); const m = s.mics.inventory[i];
-  if (!m) return;
-  const id = prompt('设备编号：', m.id); if (!id) return;
-  const type = prompt('类型：headset/handheld/lavalier', m.type);
-  const brand = prompt('品牌：', m.brand||'');
-  const channel = prompt('Channel：', m.channel||'');
-  const status = prompt('状态：ok/broken', m.status||'ok');
-  const notes = prompt('备注：', m.notes||'');
-  m.id = id; m.type = type; m.brand = brand; m.channel = channel; m.status = status; m.notes = notes;
-  save(); renderMicView(); t('已更新');
-}
-
 function delMic(i) {
   if (!confirm('删除此设备？')) return;
   gs().mics.inventory.splice(i,1);
   save(); renderMicView();
+}
+
+function addMicAssign(sceneKey) {
+  const s = gs(); const inv = s.mics.inventory || [];
+  if (!inv.length) { t('请先添加设备'); return; }
+  editingAssignSceneKey = sceneKey;
+  // Populate mic select
+  const sel = document.getElementById('maMic');
+  sel.innerHTML = '';
+  inv.forEach(m => { sel.innerHTML += `<option value="${esc(m.id)}">${esc(m.id)} - ${m.type}</option>`; });
+  document.getElementById('maActor').value = '';
+  document.getElementById('maChar').value = '';
+  document.getElementById('maNote').value = '';
+  closeMo('micMo');
+  document.getElementById('micAssignMo').classList.add('a');
+}
+
+function saveMicAssign() {
+  const s = gs(); if (!s) return;
+  const micId = document.getElementById('maMic').value;
+  const actor = document.getElementById('maActor').value.trim();
+  if (!actor) { t('请输入演员名'); return; }
+  const character = document.getElementById('maChar').value.trim();
+  const note = document.getElementById('maNote').value.trim();
+  if (!s.mics.assignments) s.mics.assignments = [];
+  s.mics.assignments = s.mics.assignments.filter(a => !(a.sceneKey === editingAssignSceneKey && a.micId === micId));
+  s.mics.assignments.push({ sceneKey: editingAssignSceneKey, micId, actor, character, note });
+  save(); closeMo('micAssignMo');
+  document.getElementById('micMo').classList.add('a');
+  renderMicAssign(); t('已分配');
 }
 
 function renderMicAssign() {
@@ -2736,22 +2864,6 @@ function renderMicAssign() {
     html += '</div>';
   });
   document.getElementById('micContentView').innerHTML = html;
-}
-
-function addMicAssign(sceneKey) {
-  const s = gs(); const inv = s.mics.inventory || [];
-  if (!inv.length) { t('请先添加设备'); return; }
-  const micList = inv.map(m => m.id).join(', ');
-  const micId = prompt(`可用设备：${micList}\n设备编号：`);
-  if (!micId || !s.mics.inventory.find(m => m.id === micId)) { t('无效编号'); return; }
-  const actor = prompt('演员名：'); if (!actor) return;
-  const character = prompt('角色名（可选）：') || '';
-  const note = prompt('备注（可选）：') || '';
-  if (!s.mics.assignments) s.mics.assignments = [];
-  // Remove existing assignment for this mic in this scene
-  s.mics.assignments = s.mics.assignments.filter(a => !(a.sceneKey === sceneKey && a.micId === micId));
-  s.mics.assignments.push({ sceneKey, micId, actor, character, note });
-  save(); renderMicAssign(); t('已分配');
 }
 
 function delMicAssign(sceneKey, micId) {
@@ -3482,19 +3594,37 @@ async function delAudioTrack(idx) {
 
 function addAudioCueFromTrack(trackIdx) {
   const s=gs(); const t=s.audioTracks[trackIdx]; if(!t) return;
-  const opts=[];
-  s.acts.forEach((act,ai)=>act.scenes.forEach((sc,si)=>opts.push({key:`${ai}-${si}`,label:`${act.name} → ${sc.name}`})));
-  if(!opts.length){t('无场景');return;}
-  const names=opts.map((o,i)=>`${i+1}. ${o.label}`).join('\n');
-  const pick=prompt(`绑定到哪个场景？\n${names}`); if(!pick) return;
-  const idx=parseInt(pick)-1; if(idx<0||idx>=opts.length) return;
-  const offset=prompt('偏移秒数 (如 0:00 从头，0:30 从30秒)', '0:00');
-  let secs=0;
-  if(offset){const p=offset.split(':');if(p.length===2)secs=parseInt(p[0])*60+parseInt(p[1]);else secs=parseInt(offset)||0;}
-  if(!s.audioCues)s.audioCues=[];
-  s.audioCues.push({id:'AC'+Date.now(),trackId:t.id,sceneKey:opts[idx].key,timing:'scene_start',offset:secs,note:''});
-  save(); setAudioView('cues'); t('已绑定Cue');
+  editingAudioTrackIdx = trackIdx;
+  // Populate scene selector
+  const sel = document.getElementById('acScene');
+  sel.innerHTML = '';
+  s.acts.forEach((act,ai) => act.scenes.forEach((sc,si) => {
+    sel.innerHTML += `<option value="${ai}-${si}">${esc(act.name)} → ${esc(sc.name)}</option>`;
+  }));
+  if (!sel.options.length) { t('无场景'); return; }
+  document.getElementById('acTrackName').textContent = '音轨: ' + (t.name||'');
+  document.getElementById('acOffsetMin').value = '0';
+  document.getElementById('acOffsetSec').value = '00';
+  document.getElementById('acNote').value = '';
+  closeMo('audioMo');
+  document.getElementById('audioCueMo').classList.add('a');
 }
+
+function saveAudioCue() {
+  const s=gs(); if(!s) return;
+  const t=s.audioTracks[editingAudioTrackIdx]; if(!t) return;
+  const sceneKey = document.getElementById('acScene').value;
+  const min = parseInt(document.getElementById('acOffsetMin').value)||0;
+  const sec = parseInt(document.getElementById('acOffsetSec').value)||0;
+  const offset = min*60+sec;
+  const note = document.getElementById('acNote').value.trim();
+  if(!s.audioCues)s.audioCues=[];
+  s.audioCues.push({id:'AC'+Date.now(),trackId:t.id,sceneKey, timing:'scene_start', offset, note});
+  save(); closeMo('audioCueMo');
+  document.getElementById('audioMo').classList.add('a');
+  setAudioView('cues'); t('已绑定Cue');
+}
+
 function editAudioCue(idx){const s=gs();const c=s.audioCues[idx];if(!c)return;const n=prompt('备注：',c.note||'');if(n===null)return;c.note=n;save();renderAudioView();}
 function delAudioCue(idx){if(!confirm('删除？'))return;gs().audioCues.splice(idx,1);save();renderAudioView();}
 
@@ -3669,21 +3799,20 @@ function editProp(idx) {
 
 function addPropSceneCue() {
   const s = gs(); if (!s) return;
-  // Build scene options
+  // Build scene options and show a select-based picker via the existing inline UI
   const opts = [];
   s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => {
     opts.push({ key: `${ai}-${si}`, label: `${act.name} → ${sc.name}` });
   }));
-  if (!opts.length) { t('还没有场景数据'); return; }
-  // Show a simple picker
+  if (!opts.length) { t('无场景'); return; }
+  // Show a prompt with numbered list - simpler than a full modal for a single selection
   const names = opts.map((o, i) => `${i+1}. ${o.label}`).join('\n');
   const pick = prompt(`选择场景 (输入编号 1-${opts.length}):\n${names}`);
   if (!pick) return;
   const idx = parseInt(pick) - 1;
-  if (idx < 0 || idx >= opts.length) { t('无效选择'); return; }
+  if (idx < 0 || idx >= opts.length) { t('无效'); return; }
   const key = opts[idx].key;
-  // Check if already added
-  if (propSceneCues.some(c => c.sceneKey === key)) { t('该场景已添加'); return; }
+  if (propSceneCues.some(c => c.sceneKey === key)) { t('已添加'); return; }
   propSceneCues.push({ sceneKey: key, onTime: '', offTime: '', onNote: '', offNote: '' });
   renderPropSceneCues();
 }
