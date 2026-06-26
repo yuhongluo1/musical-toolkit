@@ -433,12 +433,7 @@
     <button class="btn-g" onclick="showActorManager()">👥 演员</button>
     <button class="btn-g" onclick="showLineImport()">📄 追加</button>
     <button class="btn-g btn-sm" onclick="exportShow()">📤 导出</button>
-    <div style="display:flex;gap:3px;flex-wrap:wrap;">
-      <button class="btn-w btn-sm" onclick="exportCueScript('all')" title="所有cue">📋 总</button>
-      <button class="btn-g btn-sm" onclick="exportCueScript('mic')" title="仅Mic">🎤</button>
-      <button class="btn-g btn-sm" onclick="exportCueScript('light')" title="仅灯光">💡</button>
-      <button class="btn-g btn-sm" onclick="exportCueScript('prop')" title="仅道具">📦</button>
-    </div>
+    <button class="btn-w btn-sm" onclick="showExportCue()">📋 导出cue</button>
     <button class="btn-g" onclick="showMicManager()">🎤 麦克风</button>
     <button class="btn-g" onclick="showLightingCues()">💡 灯光</button>
     <button class="btn-g" onclick="showPropManager()">📦 道具</button>
@@ -756,6 +751,21 @@
       <button class="btn-g" onclick="closeMo('lineEditorMo')">取消</button>
       <button class="btn-p" onclick="saveLineEditor()">💾 保存</button>
     </div>
+  </div>
+</div>
+
+<!-- EXPORT CUE MODAL -->
+<div class="mo" id="exportCueMo">
+  <div class="md" style="max-width:400px;">
+    <h3>📋 导出Cue剧本</h3>
+    <p style="color:#888;font-size:13px;margin-bottom:14px;">选择要导出到剧本中的内容：</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button class="btn-p" onclick="doExportCue('all')" style="padding:16px;font-size:15px;font-weight:600;">📋 全部Cue</button>
+      <button class="btn-g" onclick="doExportCue('mic')" style="padding:16px;font-size:15px;">🎤 Mic分配</button>
+      <button class="btn-g" onclick="doExportCue('light')" style="padding:16px;font-size:15px;">💡 灯光Cue</button>
+      <button class="btn-g" onclick="doExportCue('prop')" style="padding:16px;font-size:15px;">📦 道具上下场</button>
+    </div>
+    <div class="fa"><button class="btn-g" onclick="closeMo('exportCueMo')">取消</button></div>
   </div>
 </div>
 
@@ -3029,6 +3039,15 @@ function exportProps() {
   const w = window.open('', '_blank', 'width=800,height=600');
   w.document.write(html);
   w.document.close();
+}
+
+function showExportCue() {
+  document.getElementById('exportCueMo').classList.add('a');
+}
+
+function doExportCue(type) {
+  closeMo('exportCueMo');
+  exportCueScript(type);
 }
 
 function exportCueScript(type) {
