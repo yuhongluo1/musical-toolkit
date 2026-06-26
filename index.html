@@ -425,19 +425,31 @@
     <button class="btn-g btn-sm" onclick="renameShow()" style="padding:2px 8px;font-size:11px;">✏️</button>
   </div>
   <div class="tb" id="showTB"></div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
-    <button class="btn-s" onclick="startPerf()">▶ 演出模式</button>
-    <button class="btn-w" onclick="startRehearsal()">🎬 排演模式</button>
-    <button class="btn-w" onclick="showTranslateAll()" id="translateBtn">🌐 翻译缺漏</button>
-    <button class="btn-g" onclick="showCharDialog()">🎭 角色台词</button>
-    <button class="btn-g" onclick="showActorManager()">👥 演员</button>
-    <button class="btn-g" onclick="showLineImport()">📄 追加</button>
-    <button class="btn-g btn-sm" onclick="exportShow()">📤 导出</button>
-    <button class="btn-w btn-sm" onclick="showExportCue()">📋 导出cue</button>
-    <button class="btn-g" onclick="showMicManager()">🎤 麦克风</button>
-    <button class="btn-g" onclick="showLightingCues()">💡 灯光</button>
-    <button class="btn-g" onclick="showPropManager()">📦 道具</button>
-    <button class="btn-d btn-sm" onclick="delShow()">🗑 删除</button>
+  <div style="margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#111;border-radius:8px;margin-bottom:3px;">
+      <span style="color:#555;font-size:10px;min-width:42px;">🎬 演出</span>
+      <button class="btn-s btn-sm" onclick="startPerf()" style="padding:5px 12px;">▶ 演出模式</button>
+      <button class="btn-w btn-sm" onclick="startRehearsal()" style="padding:5px 12px;">🎬 排演模式</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#111;border-radius:8px;margin-bottom:3px;">
+      <span style="color:#555;font-size:10px;min-width:42px;">⚙️ 制作</span>
+      <button class="btn-g btn-sm" onclick="showMicManager()" style="padding:5px 12px;">🎤 麦克风</button>
+      <button class="btn-g btn-sm" onclick="showLightingCues()" style="padding:5px 12px;">💡 灯光Cue</button>
+      <button class="btn-g btn-sm" onclick="showPropManager()" style="padding:5px 12px;">📦 道具</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#111;border-radius:8px;margin-bottom:3px;">
+      <span style="color:#555;font-size:10px;min-width:42px;">📝 剧本</span>
+      <button class="btn-g btn-sm" onclick="showCharDialog()" style="padding:5px 12px;">🎭 角色台词</button>
+      <button class="btn-g btn-sm" onclick="showActorManager()" style="padding:5px 12px;">👥 演员</button>
+      <button class="btn-g btn-sm" onclick="showLineImport()" style="padding:5px 12px;">📄 追加</button>
+      <button class="btn-w btn-sm" onclick="showTranslateAll()" id="translateBtn" style="padding:5px 12px;">🌐 翻译</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#111;border-radius:8px;">
+      <span style="color:#555;font-size:10px;min-width:42px;">💾 数据</span>
+      <button class="btn-g btn-sm" onclick="exportShow()" style="padding:5px 12px;">📤 导出</button>
+      <button class="btn-g btn-sm" onclick="showExportCue()" style="padding:5px 12px;">📋 导出Cue</button>
+      <button class="btn-d btn-sm" onclick="delShow()" style="padding:5px 12px;">🗑 删除</button>
+    </div>
   </div>
   <div id="actsContainer"></div>
 </div>
