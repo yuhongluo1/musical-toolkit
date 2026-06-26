@@ -544,6 +544,7 @@
         <button class="btn-sm" id="micViewAssign" onclick="setMicView('assign')" style="background:#333;color:#ccc;">🎭 按场景</button>
         <button class="btn-sm" id="micViewFlow" onclick="setMicView('flow')" style="background:#333;color:#ccc;">🔄 流转</button>
       </div>
+      <button class="btn-g btn-sm" onclick="exportMic()">🖨 打印</button>
       <button class="btn-g btn-sm" onclick="closeMo('micMo')">✕ 关闭</button>
     </div>
     <div id="micContentView"></div>
@@ -558,6 +559,7 @@
       <span style="color:#666;font-size:12px;">按演出顺序排列的灯光提示</span>
       <div style="flex:1;"></div>
       <button class="btn-s btn-sm" onclick="addLightCue()">＋ 添加Cue</button>
+      <button class="btn-g btn-sm" onclick="exportLights()">🖨 打印</button>
       <button class="btn-g btn-sm" onclick="closeMo('lightMo')">✕ 关闭</button>
     </div>
     <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;">
@@ -621,6 +623,7 @@
         <button class="btn-sm" id="propViewList" onclick="setPropView('list')" style="background:#2563eb;color:#fff;">📋 列表</button>
         <button class="btn-sm" id="propViewCues" onclick="setPropView('cues')" style="background:#333;color:#ccc;">📍 道具Cue</button>
       </div>
+      <button class="btn-g btn-sm" onclick="exportProps()">🖨 打印</button>
       <button class="btn-s btn-sm" onclick="addProp()">＋ 添加道具</button>
       <button class="btn-g btn-sm" onclick="closeMo('propMo')">✕ 关闭</button>
     </div>
@@ -2917,6 +2920,109 @@ function updateRhProps(line) {
     }
   });
   document.getElementById('rhPropPanel').innerHTML = h;
+}
+
+// ====================================================================
+//  EXPORT / PRINT FUNCTIONS
+// ====================================================================
+function exportMic() {
+  const s = gs(); if (!s) return;
+  const inv = s.mics?.inventory || [];
+  const assign = s.mics?.assignments || [];
+  let table = '<table><tr><th>编号</th><th>类型</th><th>品牌</th><th>Channel</th><th>状态</th></tr>';
+  inv.forEach(m => { table += `<tr><td>${esc(m.id)}</td><td>${m.type}</td><td>${esc(m.brand||'')}</td><td>${m.channel||''}</td><td>${m.status||'ok'}</td></tr>`; });
+  table += '</table>';
+  // Assignments by scene
+  let assignHtml = '';
+  s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => {
+    const key = `${ai}-${si}`;
+    const a = assign.filter(x => x.sceneKey === key);
+    if (a.length) {
+      assignHtml += `<tr><td>${esc(act.name)} → ${esc(sc.name)}</td><td>${a.map(x => `${x.micId}→${x.actor}${x.character?'('+x.character+')':''}`).join(', ')}</td></tr>`;
+    }
+  }));
+  const html = `<html><head><meta charset="utf-8"><title>Mic表 - ${s.title}</title><style>
+    body{font-family:sans-serif;padding:24px;color:#222}
+    h1{font-size:18px;margin-bottom:4px}
+    h2{font-size:14px;color:#666;margin:16px 0 8px}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+    th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}
+    th{background:#f5f5f5;font-weight:600}
+    @media print{body{padding:12px}button{display:none}}
+  </style></head><body>
+    <h1>🎤 Mic表 — ${esc(s.title)}</h1>
+    <p style="color:#888;font-size:12px;">${new Date().toLocaleDateString()}</p>
+    <h2>设备清单 (${inv.length}支)</h2>${table}
+    <h2>按场景分配</h2><table><tr><th>场景</th><th>分配</th></tr>${assignHtml||'<tr><td colspan="2" style="color:#999;">无分配</td></tr>'}</table>
+    <button onclick="window.print()" style="margin-top:12px;padding:6px 16px;">🖨 打印</button>
+  </body></html>`;
+  const w = window.open('', '_blank', 'width=800,height=600');
+  w.document.write(html);
+  w.document.close();
+}
+
+function exportLights() {
+  const s = gs(); if (!s) return;
+  const cues = s.lightingCues || [];
+  const sorted = [...cues].sort((a,b)=>(a.seq||0)-(b.seq||0));
+  let rows = '<tr><th>#</th><th>编号</th><th>描述</th><th>场景</th><th>触发</th><th>操作员</th><th>淡入/淡出</th></tr>';
+  sorted.forEach((c,i) => {
+    rows += `<tr><td>${i+1}</td><td>${esc(c.number||'')}</td><td>${esc(c.desc||'')}</td><td>${esc(c.sceneLabel||'')}</td><td>${esc(c.timingLabel||'')}</td><td>${esc(c.operator||'')}</td><td>${esc(c.fade||'instant')}</td></tr>`;
+  });
+  const html = `<html><head><meta charset="utf-8"><title>灯光Cue表 - ${s.title}</title><style>
+    body{font-family:sans-serif;padding:24px;color:#222}
+    h1{font-size:18px} p{color:#888;font-size:12px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}
+    th{background:#f5f5f5}
+    @media print{body{padding:12px}button{display:none}}
+  </style></head><body>
+    <h1>💡 灯光Cue表 — ${esc(s.title)}</h1>
+    <p>${new Date().toLocaleDateString()} · 共 ${sorted.length} 个Cue</p>
+    <table>${rows}</table>
+    <button onclick="window.print()" style="margin-top:12px;padding:6px 16px;">🖨 打印</button>
+  </body></html>`;
+  const w = window.open('', '_blank', 'width=800,height=600');
+  w.document.write(html);
+  w.document.close();
+}
+
+function exportProps() {
+  const s = gs(); if (!s) return;
+  const props = s.props || [];
+  let rows = '<tr><th>道具</th><th>类别</th><th>存放位置</th><th>出现场景</th><th>负责人</th><th>状态</th><th>上场/下场时机</th></tr>';
+  props.forEach(p => {
+    const cat = p.category==='hand_prop'?'手持':p.category==='furniture'?'家具':p.category==='costume_addon'?'服饰':'其他';
+    const status = p.status==='ready'?'就绪':p.status==='needs_acquire'?'需借用':p.status==='needs_repair'?'需修理':'丢失';
+    const sceneLabels = (p.sceneCues||[]).map(c => {
+      try {
+        const [ai,si] = c.sceneKey.split('-').map(Number);
+        if(s.acts[ai]&&s.acts[ai].scenes[si]) {
+          let l = s.acts[ai].name+'→'+s.acts[ai].scenes[si].name;
+          if(c.onTime||c.offTime) l += (c.onTime?' ↑'+c.onTime:'')+(c.offTime?' ↓'+c.offTime:'');
+          return l;
+        }
+      }catch(e){}
+      return c.sceneKey;
+    }).join(', ');
+    rows += `<tr><td>${esc(p.name||'')}</td><td>${cat}</td><td>${esc(p.location||'')}</td><td style="font-size:11px;">${esc(sceneLabels)}</td><td>${esc(p.handler||'')}</td><td>${status}</td><td style="font-size:11px;">${esc(p.sceneNote||'')}</td></tr>`;
+  });
+  const html = `<html><head><meta charset="utf-8"><title>道具表 - ${s.title}</title><style>
+    body{font-family:sans-serif;padding:24px;color:#222}
+    h1{font-size:18px} p{color:#888;font-size:12px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}
+    th{background:#f5f5f5}
+    @media print{body{padding:12px}button{display:none}}
+  </style></head><body>
+    <h1>📦 道具表 — ${esc(s.title)}</h1>
+    <p>${new Date().toLocaleDateString()} · 共 ${props.length} 件道具</p>
+    <table>${rows}</table>
+    <button onclick="window.print()" style="margin-top:12px;padding:6px 16px;">🖨 打印</button>
+  </body></html>`;
+  const w = window.open('', '_blank', 'width=800,height=600');
+  w.document.write(html);
+  w.document.close();
 }
 
 // ====================================================================
