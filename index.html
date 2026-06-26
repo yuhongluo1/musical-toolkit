@@ -1,0 +1,2222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音乐剧字幕工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:#0d0d0d;color:#e0e0e0;min-height:100vh;
+  }
+  button{cursor:pointer;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:500;transition:all .15s}
+  button:active{transform:scale(.97)}
+  input,textarea,select{
+    background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:6px;
+    padding:10px 14px;font-size:14px;font-family:inherit;width:100%
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:#6af}
+  textarea{resize:vertical}
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-track{background:#0d0d0d}
+  ::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+
+  .btn-p{background:#2563eb;color:#fff}.btn-p:hover{background:#1d4ed8}
+  .btn-s{background:#059669;color:#fff}.btn-s:hover{background:#047857}
+  .btn-d{background:#dc2626;color:#fff}.btn-d:hover{background:#b91c1c}
+  .btn-w{background:#d97706;color:#fff}.btn-w:hover{background:#b45309}
+  .btn-g{background:#2a2a2a;color:#ccc}.btn-g:hover{background:#3a3a3a;color:#fff}
+  .btn-sm{padding:5px 12px;font-size:12px}
+
+  #hdr{
+    background:#111;padding:12px 24px;display:flex;align-items:center;
+    justify-content:space-between;border-bottom:1px solid #1a1a1a;flex-wrap:wrap;gap:8px;
+  }
+  #hdr h1{font-size:17px;font-weight:700;color:#6af}
+  .ha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  .page{display:none;max-width:1060px;margin:0 auto;padding:20px 24px 40px}
+  .page.a{display:block}
+
+  .hero{
+    background:linear-gradient(135deg,#111827,#1a1a2e);border:1px solid #1a1a1a;
+    border-radius:20px;padding:40px;text-align:center;margin-bottom:28px;
+  }
+  .hero h2{font-size:28px;color:#fff;margin-bottom:4px}
+  .hero p{color:#666;font-size:14px;margin-bottom:24px}
+  .drop-zone{
+    border:2px dashed #2a2a2a;border-radius:14px;padding:40px 20px;
+    text-align:center;cursor:pointer;transition:all .2s;
+  }
+  .drop-zone:hover{border-color:#6af;background:rgba(37,99,235,.04)}
+  .drop-zone .big{font-size:40px;margin-bottom:6px}
+  .drop-zone p{color:#999;font-size:14px}
+  .drop-zone .sm{color:#444;font-size:12px;margin-top:6px}
+
+  .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:14px}
+  .sc{
+    background:#131313;border:1px solid #1a1a1a;border-radius:12px;
+    padding:14px;cursor:pointer;transition:all .2s
+  }
+  .sc:hover{border-color:#6af;transform:translateY(-1px)}
+  .sc h3{font-size:15px;color:#fff}
+  .sc .m{color:#555;font-size:12px;margin-top:3px}
+  .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:6px;margin-top:6px}
+  .badge-ok{background:#064e3b;color:#6ee7b7}
+  .badge-warn{background:#451a03;color:#fbbf24}
+
+  /* SHOW */
+  .bk{background:none;color:#6af;padding:0;font-size:13px;cursor:pointer}
+  .bk:hover{text-decoration:underline}
+  .sdh h2{font-size:24px;color:#fff}
+  .tb{
+    display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;
+    padding:10px 14px;background:#111;border-radius:8px;
+  }
+  .tb .st{color:#666;font-size:12px}
+  .tb .st span{color:#fff;font-weight:600}
+  .act{margin-bottom:16px}
+  .ah{
+    display:flex;align-items:center;gap:10px;padding:8px 14px;
+    background:#151515;border-radius:8px;margin-bottom:6px
+  }
+  .ah h3{font-size:15px;color:#ddd;flex:1}
+  .scn{
+    display:flex;align-items:center;gap:8px;
+    background:#111;border:1px solid #1a1a1a;border-radius:6px;
+    padding:8px 12px;cursor:pointer;transition:all .15s;margin-bottom:3px
+  }
+  .scn:hover{border-color:#333}
+  .scn .nm{flex:1;font-size:13px;color:#ccc}
+  .sty{font-size:10px;padding:1px 8px;border-radius:8px;font-weight:500;white-space:nowrap}
+  .sty.sg{background:#0c1929;color:#6af}
+  .sty.dl{background:#1a0e3a;color:#a78bfa}
+
+  /* PARSE PREVIEW */
+  .pv{max-height:60vh;overflow-y:auto;border:1px solid #1a1a1a;border-radius:10px;margin:14px 0}
+  .pv-item{
+    display:grid;grid-template-columns:80px 1fr 70px;
+    gap:8px;padding:6px 10px;border-bottom:1px solid #141414;
+    align-items:center;font-size:13px;transition:background .15s;
+  }
+  .pv-item:hover{background:#111}
+  .pv-item .tag{
+    font-size:10px;padding:2px 6px;border-radius:4px;text-align:center;font-weight:500;
+  }
+  .tag-act{background:#1e3a5f;color:#93c5fd}
+  .tag-song{background:#1e3a5f;color:#93c5fd}
+  .tag-scene{background:#2d1b69;color:#c4b5fd}
+  .tag-char{background:#7c2d12;color:#fdba74}
+  .tag-en{background:#1a1a1a;color:#aaa}
+  .tag-cn{background:#0c3318;color:#6ee7b7}
+  .tag-sd{background:#1f1f1f;color:#888}
+  .tag-skip{background:#111;color:#555;font-style:italic}
+  .pv-item .txt{color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pv-item .act{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap}
+  .pv-item .act button{padding:2px 6px;font-size:10px;border-radius:3px;background:#222;color:#888;white-space:nowrap}
+  .pv-item .act button:hover{background:#333;color:#fff}
+  .pv-item .act button.cur{background:#1e3a5f;color:#93c5fd}
+  .pv-empty{text-align:center;padding:40px;color:#555}
+
+  .li{
+    display:grid;grid-template-columns:28px 1fr 32px;
+    gap:6px;padding:6px 10px;border-bottom:1px solid #141414;align-items:start
+  }
+  .li:hover{background:#111}
+  .li .n{color:#444;font-size:11px;text-align:center;padding-top:4px}
+  .li .tx .ch{color:#fdba74;font-size:12px;font-weight:500}
+  .li .tx .e{color:#ddd;font-size:14px}
+  .li .tx .c{color:#6af;font-size:14px}
+  .li .tx .c.ms{color:#fbbf24;font-style:italic}
+  .li .tx .sd{color:#666;font-size:12px;font-style:italic}
+  .li .ac{display:flex;flex-direction:column;gap:3px;padding-top:2px}
+  .li .ac button{padding:2px 5px;font-size:10px;border-radius:3px;background:#222;color:#777}
+  .li .ac button:hover{background:#333;color:#fff}
+  .li.ms{border-left:2px solid #f59e0b}
+  .li-insert{
+    height:6px;text-align:center;cursor:pointer;color:#333;font-size:12px;
+    line-height:6px;transition:all .15s;user-select:none;
+    position:relative;z-index:2;
+  }
+  .li-insert:hover{
+    height:18px;line-height:18px;color:#6af;background:rgba(37,99,235,.08);
+  }
+
+  .mo{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);
+    z-index:100;align-items:center;justify-content:center
+  }
+  .mo.a{display:flex}
+  .md{
+    background:#151515;border:1px solid #222;border-radius:14px;
+    padding:24px;width:92%;max-width:720px;max-height:85vh;overflow-y:auto
+  }
+  .md h3{font-size:17px;color:#fff;margin-bottom:12px}
+  .fg{margin-bottom:12px}
+  .fg label{display:block;font-size:12px;color:#888;margin-bottom:3px}
+  .fa{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+  .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  code{background:#222;padding:1px 5px;border-radius:3px;font-size:12px}
+
+  /* PERFORMANCE */
+  #pf{
+    display:none;position:fixed;inset:0;z-index:200;
+    background:#000;color:#fff;overflow:hidden;flex-direction:column
+  }
+  #pf.a{display:flex}
+  #pf-hdr{
+    padding:10px 24px;display:flex;justify-content:space-between;
+    align-items:center;border-bottom:1px solid #111;font-size:13px;color:#444
+  }
+  #pf-close{background:none;color:#555;padding:4px 12px;font-size:18px}
+  #pf-close:hover{color:#fff}
+  #pf-body{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:40px 60px;user-select:none;cursor:pointer;
+    overflow-y:auto;
+  }
+  .pf-char{font-size:clamp(20px,3.5vw,36px);color:#fdba74;margin-bottom:12px;font-weight:500}
+  .pf-en{font-size:clamp(32px,5vw,60px);font-weight:300;text-align:center;line-height:1.5;margin-bottom:22px;color:#fff;max-width:95%;word-wrap:break-word}
+  .pf-cn{font-size:clamp(26px,4vw,48px);font-weight:400;text-align:center;line-height:1.6;color:#6af;max-width:95%;word-wrap:break-word}
+  .pf-cn.ms{color:#fbbf24;font-style:italic}
+  .pf-sd{color:#555;font-size:clamp(18px,2.5vw,30px);font-style:italic;text-align:center}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+  .pf-scene-tag{color:#444;font-size:12px;margin-bottom:6px}
+  #pf-ftr{
+    padding:10px 24px;display:flex;justify-content:space-between;
+    align-items:center;border-top:1px solid #111;font-size:12px;color:#444
+  }
+  #pf-ftr button{background:none;border:1px solid #222;color:#666;padding:4px 14px;border-radius:6px}
+  #pf-ftr button:hover{border-color:#444;color:#ccc}
+  /* PREVIEW PANEL */
+  #pf-preview{
+    border-top:1px solid #111;padding:10px 24px;background:#0a0a0a;
+    display:flex;gap:16px;overflow-x:auto;min-height:80px;
+  }
+  .pf-next-item{
+    flex-shrink:0;width:280px;background:#111;border-radius:8px;
+    padding:10px 14px;border:1px solid #1a1a1a;
+  }
+  .pf-next-item .n{color:#444;font-size:10px;margin-bottom:4px}
+  .pf-next-item .nc{color:#fdba74;font-size:12px;font-weight:500}
+  .pf-next-item .nt{color:#666;font-size:12px;line-height:1.4}
+  /* PROJECTOR WINDOW */
+  #pf-projector-open{background:#059669;color:#fff;padding:4px 14px;border-radius:6px;border:none}
+  #pf-projector-open:hover{background:#047857}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:#151515;color:#fff;padding:10px 24px;border-radius:10px;
+    border:1px solid #333;z-index:300;font-size:13px;opacity:0;
+    transition:opacity .3s;pointer-events:none
+  }
+  .toast.show{opacity:1}
+  .wm{
+    position:fixed;bottom:12px;right:16px;color:#444;font-size:11px;
+    font-weight:300;letter-spacing:0.5px;pointer-events:none;z-index:9999;
+    text-align:right;line-height:1.4;opacity:0.6
+  }
+  .wm .en{font-size:9px;color:#333}
+
+  @media(max-width:768px){
+    .pv-item{grid-template-columns:60px 1fr 50px}
+    #pf-body{padding:20px}
+    .fr{grid-template-columns:1fr}
+    .li{grid-template-columns:24px 1fr}
+    .li .ac{grid-column:2;flex-direction:row}
+  }
+
+  /* TRANSLATE PROGRESS */
+  .tp{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:150;
+    background:#151515;border:1px solid #333;border-radius:10px;padding:14px 22px;
+    text-align:center;display:none;min-width:260px
+  }
+  .tp.a{display:block}
+  .tp .bar{height:3px;background:#222;border-radius:2px;margin-top:8px;overflow:hidden}
+  .tp .bar-in{height:100%;background:#2563eb;border-radius:2px;transition:width .3s}
+  .tp .st{color:#999;font-size:13px}
+  .tp .st span{color:#fff;font-weight:600}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <h1>🎭 字幕工具</h1>
+  <div class="ha">
+    <button class="btn-g btn-sm" onclick="showSettings()">⚙️</button>
+    <button class="btn-g btn-sm" onclick="exportAll()">📤 导出</button>
+    <button class="btn-g btn-sm" onclick="document.getElementById('impFile').click()">📥 导入</button>
+    <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<div class="wm"><div>罗雨虹 · 原创 禁止盗用</div><div class="en">Luo Yuhong · All Rights Reserved</div></div>
+<div id="tr-progress" class="tp">
+  <div class="st">翻译中 <span id="tr-done">0</span> / <span id="tr-total">0</span></div>
+  <div class="bar"><div class="bar-in" id="tr-bar"></div></div>
+</div>
+
+<!-- HOME -->
+<div id="p-home" class="page a">
+  <div class="hero">
+    <h2>音乐剧字幕工具</h2>
+    <p>上传 Word 文档 → 预览解析结果 → 一键演出</p>
+    <div class="drop-zone" id="dropZone">
+      <div class="big">📄</div>
+      <p><strong>上传文档</strong> (.docx / .pdf)</p>
+      <div class="sm">或拖拽到这里</div>
+    </div>
+    <input type="file" id="docxInput" accept=".docx,.pdf" style="display:none" onchange="handleFile(event)">
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;">
+      <span style="color:#555;font-size:12px;">解析策略：</span>
+      <select id="strategySelect" style="max-width:200px;font-size:12px;padding:6px 10px;" onchange="saveStrategy()">
+        <option value="standard">🎯 角色名全大写+冒号</option>
+        <option value="bracketed">📦 角色名在方括号里 [BONNIE]</option>
+        <option value="same-line">📝 角色名和台词同行</option>
+        <option value="auto">🤖 自动识别</option>
+      </select>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-g btn-sm" onclick="showTextImport()">✏️ 粘贴文本</button>
+      <button class="btn-g btn-sm" onclick="showManualCreate()">📝 手动创建</button>
+    </div>
+  </div>
+  <h3 style="font-size:15px;color:#888;margin-bottom:10px;">我的剧目</h3>
+  <div id="showGrid" class="sg"></div>
+</div>
+
+<!-- TEXT IMPORT MODAL -->
+<div class="mo" id="textImportMo">
+  <div class="md">
+    <h3>📝 粘贴剧本</h3>
+    <p style="color:#888;font-size:13px;margin-bottom:14px;">
+      支持三种解析策略，选一个跟你的剧本排版最像的：
+    </p>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:4px;background:#222;padding:6px 12px;border-radius:8px;cursor:pointer;border:2px solid transparent;font-size:12px;" id="strLabelStandard" class="strategy-label" onclick="setTextStrategy('standard')">
+        <input type="radio" name="textStrategy" value="standard" checked style="accent-color:#2563eb;width:auto;"> 🎯 全大写+冒号
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;background:#222;padding:6px 12px;border-radius:8px;cursor:pointer;border:2px solid transparent;font-size:12px;" id="strLabelBracketed" class="strategy-label" onclick="setTextStrategy('bracketed')">
+        <input type="radio" name="textStrategy" value="bracketed" style="accent-color:#2563eb;width:auto;"> 📦 方括号 [BONNIE]
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;background:#222;padding:6px 12px;border-radius:8px;cursor:pointer;border:2px solid transparent;font-size:12px;" id="strLabelSameLine" class="strategy-label" onclick="setTextStrategy('same-line')">
+        <input type="radio" name="textStrategy" value="same-line" style="accent-color:#2563eb;width:auto;"> 📝 角色名台词同行
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;background:#222;padding:6px 12px;border-radius:8px;cursor:pointer;border:2px solid transparent;font-size:12px;" id="strLabelAuto" class="strategy-label" onclick="setTextStrategy('auto')">
+        <input type="radio" name="textStrategy" value="auto" style="accent-color:#2563eb;width:auto;"> 🤖 自动
+      </label>
+    </div>
+    <p style="color:#666;font-size:12px;margin-bottom:14px;">
+      也可以手动用 <code>@ACT</code> <code>@SONG</code> <code>@SCENE</code> 标记
+    </p>
+    <div class="fr">
+      <div class="fg"><label>剧名 (英文)</label><input id="tiTitle" placeholder="Come From Away"></div>
+      <div class="fg"><label>剧名 (中文)</label><input id="tiTitleCn" placeholder="来自远方"></div>
+    </div>
+    <div class="fg"><label>剧本内容</label>
+      <textarea id="tiContent" rows="12" placeholder="ACT I&#10;&#10;SONG: Welcome to the Rock&#10;&#10;(The stage is dark)&#10;&#10;BONNIE:&#10;Welcome to the rock&#10;欢迎来到岩石岛"></textarea>
+    </div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('textImportMo')">取消</button>
+      <button class="btn-p" onclick="previewTextImport()">下一步：预览解析</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL CREATE -->
+<div class="mo" id="mcMo">
+  <div class="md">
+    <h3>手动创建</h3>
+    <div class="fg"><label>剧名 (英文) *</label><input id="mcTitle"></div>
+    <div class="fg"><label>剧名 (中文)</label><input id="mcTitleCn"></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('mcMo')">取消</button>
+      <button class="btn-p" onclick="manualCreate()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- PARSE PREVIEW MODAL -->
+<div class="mo" id="previewMo">
+  <div class="md" style="max-width:800px;">
+    <h3>🔍 解析预览 <span style="font-weight:400;color:#888;font-size:13px;">— 检查每行识别是否正确</span></h3>
+    <p style="color:#888;font-size:12px;margin-bottom:10px;">
+      点击标签可修改类型 · 🟡 标记 = 需要你确认
+    </p>
+    <div id="previewStats" style="margin-bottom:10px;font-size:12px;color:#666;"></div>
+    <div id="previewList" class="pv"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+      <button class="btn-d btn-sm" onclick="closeMo('previewMo')">取消</button>
+      <button class="btn-p" onclick="confirmImport()">✅ 确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHOW DETAIL -->
+<div id="p-show" class="page">
+  <button class="bk" onclick="navHome()">← 返回</button>
+  <div class="sdh" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <h2 id="showTitle" style="cursor:pointer;" onclick="renameShow()" title="点击改名"></h2>
+    <span id="showTitleCn" style="color:#888;font-size:14px;"></span>
+    <button class="btn-g btn-sm" onclick="renameShow()" style="padding:2px 8px;font-size:11px;">✏️</button>
+  </div>
+  <div class="tb" id="showTB"></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+    <button class="btn-s" onclick="startPerf()">▶ 演出模式</button>
+    <button class="btn-w" onclick="showTranslateAll()" id="translateBtn">🌐 翻译缺漏</button>
+    <button class="btn-g" onclick="showCharDialog()">🎭 角色台词</button>
+    <button class="btn-g" onclick="showActorManager()">👥 演员</button>
+    <button class="btn-g" onclick="showLineImport()">📄 追加</button>
+    <button class="btn-g btn-sm" onclick="exportShow()">📤 导出</button>
+    <button class="btn-d btn-sm" onclick="delShow()">🗑 删除</button>
+  </div>
+  <div id="actsContainer"></div>
+</div>
+
+<!-- SCENE EDITOR -->
+<div id="p-scene" class="page">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+    <button class="bk" onclick="navShow()">← 返回</button>
+    <span style="flex:1;color:#fff;font-size:14px;" id="sceneLabel"></span>
+    <span id="sceneLineStats" style="color:#555;font-size:12px;"></span>
+    <input id="lineSearch" placeholder="🔍 搜索" style="max-width:130px;" oninput="renderLines()">
+    <button class="btn-s btn-sm" onclick="openLineEditor(-1)">＋添加</button>
+  </div>
+  <div id="linesContainer"></div>
+</div>
+
+<!-- LINE IMPORT MODAL -->
+<div class="mo" id="liMo">
+  <div class="md">
+    <h3>追加导入</h3>
+    <div class="fg"><label>文本（@ACT / @SONG / @SCENE 标记）</label><textarea id="liContent" rows="10"></textarea></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('liMo')">取消</button>
+      <button class="btn-p" onclick="importLines()">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHARACTER DIALOGUE MODAL -->
+<div class="mo" id="charMo">
+  <div class="md" style="max-width:750px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="display:flex;gap:4px;">
+        <button class="btn-sm" id="charViewChars" onclick="setCharView('chars')" style="background:#2563eb;color:#fff;">🎭 角色</button>
+        <button class="btn-sm" id="charViewActors" onclick="setCharView('actors')" style="background:#333;color:#ccc;">👥 演员</button>
+      </div>
+      <input id="charSearch" placeholder="🔍 搜索..." style="max-width:180px;" oninput="renderCharList()">
+      <span id="charTotal" style="color:#666;font-size:12px;"></span>
+      <div style="flex:1;"></div>
+      <button class="btn-g btn-sm" onclick="closeMo('charMo')">✕ 关闭</button>
+    </div>
+    <div id="charList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;max-height:200px;overflow-y:auto;"></div>
+    <div id="charLines" style="max-height:55vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- ACTOR MANAGEMENT MODAL -->
+<div class="mo" id="actorMo">
+  <div class="md" style="max-width:650px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <h3 style="margin:0;">👥 演员管理</h3>
+      <span style="color:#666;font-size:12px;">把角色分配到演员</span>
+      <div style="flex:1;"></div>
+      <button class="btn-g btn-sm" onclick="closeMo('actorMo')">✕ 关闭</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <input id="newActorName" placeholder="演员名" style="max-width:150px;" onkeydown="if(event.key==='Enter')addActor()">
+      <button class="btn-s btn-sm" onclick="addActor()">＋ 添加演员</button>
+    </div>
+    <div id="actorList" style="max-height:60vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="mo" id="settingsMo">
+  <div class="md">
+    <h3>⚙️ 设置</h3>
+    <div class="fg">
+      <label>翻译引擎</label>
+      <select id="trEngine" onchange="saveSettings()">
+        <option value="auto">🌐 在线（MyMemory + LibreTranslate）</option>
+        <option value="ollama">🖥 本地（Ollama）</option>
+        <option value="off">🚫 关闭翻译</option>
+      </select>
+    </div>
+    <div id="ollamaSettings" style="display:none;">
+      <div class="fg"><label>Ollama 地址</label><input id="ollamaUrl" value="http://localhost:11434" onchange="saveSettings()"></div>
+      <div class="fg"><label>模型</label><input id="ollamaModel" value="qwen2.5:7b" placeholder="如 qwen2.5:7b, llama3.1:8b" onchange="saveSettings()"></div>
+      <p style="color:#888;font-size:12px;margin-top:4px;">需要先安装 Ollama：<code>brew install ollama</code> · <code>ollama pull qwen2.5:7b</code></p>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:#111;border-radius:8px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#ccc;">
+        <input type="checkbox" id="trOverwrite" onchange="saveSettings()"> 覆盖已有中文翻译（重新翻译所有台词）
+      </label>
+    </div>
+    <div style="margin-top:10px;padding:12px;background:#111;border-radius:8px;" id="ollamaTestSection">
+      <button class="btn-s btn-sm" onclick="testOllama()">🔍 测试 Ollama 连接</button>
+      <span id="ollamaTestResult" style="color:#888;font-size:12px;margin-left:10px;"></span>
+    </div>
+    <div class="fa"><button class="btn-g" onclick="closeMo('settingsMo')">关闭</button></div>
+  </div>
+</div>
+
+<!-- LINE EDITOR MODAL -->
+<div class="mo" id="lineEditorMo">
+  <div class="md" style="max-width:600px;">
+    <h3 id="leTitle">编辑对白</h3>
+    <div class="fg">
+      <label>类型</label>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sm" id="leTypeDialogue" onclick="setLineType('dialogue')" style="flex:1;">💬 对白</button>
+        <button class="btn-sm" id="leTypeSd" onclick="setLineType('sd')" style="flex:1;">📋 舞台指示</button>
+      </div>
+    </div>
+    <div id="leDialogueFields">
+      <div class="fg">
+        <label>角色名（留空 = 无角色）</label>
+        <input id="leChar" placeholder="如 BONNIE, CLAUDE, ALL…">
+      </div>
+      <div class="fr">
+        <div class="fg"><label>英文</label><textarea id="leEn" rows="2"></textarea></div>
+        <div class="fg"><label>中文 <span style="color:#fbbf24;">(留空=缺翻译)</span></label><textarea id="leCn" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div id="leSdField" style="display:none;">
+      <div class="fg"><label>舞台指示内容</label><textarea id="leSd" rows="3"></textarea></div>
+    </div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('lineEditorMo')">取消</button>
+      <button class="btn-p" onclick="saveLineEditor()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- RENAME MODAL -->
+<div class="mo" id="renameMo">
+  <div class="md" style="max-width:400px;">
+    <h3>✏️ 修改剧名</h3>
+    <div class="fg"><label>剧名 (英文) *</label><input id="reTitle"></div>
+    <div class="fg"><label>剧名 (中文)</label><input id="reTitleCn"></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('renameMo')">取消</button>
+      <button class="btn-p" onclick="saveRename()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- PERFORMANCE -->
+<div id="pf">
+  <div id="pf-hdr">
+    <span id="pf-show-title"></span>
+    <span id="pf-scene-label"></span>
+    <div style="display:flex;gap:6px;">
+      <button class="btn-g btn-sm" id="pf-jump-btn" onclick="showSceneJump()">📋 跳转</button>
+      <button id="pf-projector-open" onclick="openProjector()">🖥 投屏</button>
+      <button id="pf-close" onclick="exitPerf()">✕</button>
+    </div>
+  </div>
+  <div id="pf-body" onclick="pfNext()">
+    <div class="pf-scene-tag" id="pfSceneTag"></div>
+    <div id="pfTitleCard" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;width:100%;">
+      <div style="font-size:clamp(36px,6vw,72px);font-weight:700;color:#fff;margin-bottom:8px;" id="pfTitleEn"></div>
+      <div style="font-size:clamp(24px,4vw,48px);color:#6af;margin-bottom:24px;" id="pfTitleCn"></div>
+      <div style="font-size:clamp(14px,2vw,20px);color:#555;animation:pulse 2s ease-in-out infinite;">点击开始 ▶</div>
+    </div>
+    <div class="pf-char" id="pfChar"></div>
+    <div class="pf-en" id="pfEn"></div>
+    <div class="pf-cn" id="pfCn"></div>
+    <div class="pf-sd" id="pfSd"></div>
+    <div style="color:#333;font-size:18px;padding:20px;display:none;" id="pfEmpty">点击开始 ▶</div>
+  </div>
+  <div id="pf-ftr">
+    <span id="pfProg">0 / 0</span>
+    <span style="color:#333;font-size:11px;">← → 翻页 · ESC 退出</span>
+    <div style="display:flex;gap:4px;">
+      <button onclick="editPerfCn()" style="background:none;border:1px solid #222;color:#6af;padding:4px 10px;border-radius:6px;font-size:11px;">✏️ 中文</button>
+      <button onclick="exitToEdit()" style="background:none;border:1px solid #222;color:#6ee7b7;padding:4px 10px;border-radius:6px;font-size:11px;">📝 编辑</button>
+      <button id="pfPrevBtn" onclick="pfPrev(event)">← 上一条</button>
+    </div>
+  </div>
+  <div id="pf-preview"></div>
+  <!-- SCENE JUMP MODAL (inside performance) -->
+  <div class="mo" id="pfJumpMo">
+    <div class="md" style="max-width:500px;">
+      <h3>📋 跳转到歌曲/场景</h3>
+      <div id="pfJumpList" style="max-height:60vh;overflow-y:auto;"></div>
+      <div class="fa"><button class="btn-g" onclick="closeMo('pfJumpMo')">取消</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====================================================================
+//  DATA
+// ====================================================================
+let data = { shows: [] };
+let curShow = null, curAct = null, curScene = null;
+let perfIdx = 0;
+
+// Pending parse preview data
+let pendingShow = null;
+
+function load(){
+  try{const s=localStorage.getItem('st3');if(s)data=JSON.parse(s)}catch(e){}
+  if(!data.shows)data.shows=[]
+  // Migrate old data: add type:'dialogue' to lines that are missing it
+  let migrated = false;
+  data.shows.forEach(show => {
+    (show.acts||[]).forEach(act => {
+      (act.scenes||[]).forEach(sc => {
+        (sc.lines||[]).forEach(l => {
+          if (!l.type && l.en !== undefined) { l.type = 'dialogue'; migrated = true; }
+        });
+      });
+    });
+  });
+  if (migrated) save();
+}
+function save(){localStorage.setItem('st3',JSON.stringify(data))}
+function t(m){const o=document.getElementById('toast');o.textContent=m;o.classList.add('show');clearTimeout(o._t);o._t=setTimeout(()=>o.classList.remove('show'),2000)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function page(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('a'));document.getElementById(id).classList.add('a')}
+function closeMo(id){document.getElementById(id).classList.remove('a')}
+document.querySelectorAll('.mo').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('a')})})
+
+// ====================================================================
+//  STRATEGY SELECTOR
+// ====================================================================
+let currentStrategy = 'standard';
+
+function getStrategy() {
+  const sel = document.getElementById('strategySelect');
+  return sel ? sel.value : 'standard';
+}
+
+function saveStrategy() {
+  currentStrategy = getStrategy();
+}
+
+function setTextStrategy(s) {
+  currentStrategy = s;
+  // Update radio visual
+  document.querySelectorAll('.strategy-label').forEach(l => l.style.borderColor = 'transparent');
+  const labels = { standard: 'strLabelStandard', bracketed: 'strLabelBracketed', 'same-line': 'strLabelSameLine', auto: 'strLabelAuto' };
+  const el = document.getElementById(labels[s]);
+  if (el) el.style.borderColor = '#2563eb';
+}
+
+function parseWithStrategy(text, strategy) {
+  const raw = text.split('\n').map(l=>l.trim()).filter(l=>l);
+  
+  if (strategy === 'bracketed') {
+    return parseBracketed(raw);
+  } else if (strategy === 'same-line') {
+    return parseSameLine(raw);
+  } else if (strategy === 'auto') {
+    // Try standard first, fall back to bracketed if few char names detected
+    const standard = parseStandard(raw);
+    const charCount = standard.filter(i => i.type === 'char').length;
+    if (charCount < 3) {
+      const bracketed = parseBracketed(raw);
+      if (bracketed.filter(i => i.type === 'char').length > charCount) return bracketed;
+    }
+    return standard;
+  }
+  return parseStandard(raw);
+}
+
+function parseStandard(raw) {
+  // Original parser: ALL CAPS names with colon, stage directions in brackets/parens
+  return parseToItemsInternal(raw);
+}
+
+function parseBracketed(raw) {
+  // Character names in brackets: [BONNIE], (BONNIE)
+  // Stage directions in parentheses (that aren't character names)
+  // Everything else is dialogue
+  const items = [];
+  for (let i = 0; i < raw.length; i++) {
+    const line = raw[i];
+    
+    if (line.startsWith('@ACT')) { items.push({ type:'act', text: line.replace(/@ACT\s*/i,'').trim() }); continue; }
+    if (line.startsWith('@SONG')) { items.push({ type:'song', text: line.replace(/@SONG\s*/i,'').trim() }); continue; }
+    if (line.startsWith('@SCENE')) { items.push({ type:'scene', text: line.replace(/@SCENE\s*/i,'').trim() }); continue; }
+    if (/^ACT\s+(I{1,3}|V?I{0,3}|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)/i.test(line) && line.length < 40) {
+      items.push({ type:'act', text: line }); continue; }
+    if (/^SONG[:]/i.test(line)) { items.push({ type:'song', text: line.replace(/^SONG[:]\s*/i,'').trim() }); continue; }
+    
+    // [CHARACTER NAME] or (CHARACTER NAME) - but only if it's ALL CAPS
+    const bracketMatch = line.match(/^[\[\(（]([A-Z][A-Z\s&\/\d\-]+)[\]\)）]\s*(.*)/);
+    if (bracketMatch) {
+      const charName = bracketMatch[1].trim();
+      const rest = bracketMatch[2].trim();
+      items.push({ type:'char', text: charName });
+      if (rest) {
+        const hasChinese = /[\u4e00-\u9fff]/.test(rest);
+        const hasEnglish = /[a-zA-Z]/.test(rest);
+        if (hasChinese && !hasEnglish) items.push({ type:'cn', text: rest });
+        else items.push({ type:'en', text: rest });
+      }
+      continue;
+    }
+    
+    // Stage directions (italic/bracketed stuff that isn't a character name)
+    if (/^[\[\(（]/.test(line) && !/^[\[\(（]\s*[A-Z]{3}/.test(line)) {
+      const clean = line.replace(/^[\[\(（]\s*/,'').replace(/\s*[\]\)）]$/,'');
+      items.push({ type:'sd', text: clean });
+      continue;
+    }
+    
+    // Dialogue
+    const hasChinese = /[\u4e00-\u9fff]/.test(line);
+    const hasEnglish = /[a-zA-Z]/.test(line);
+    if (hasChinese && !hasEnglish) items.push({ type:'cn', text: line });
+    else if (hasEnglish) items.push({ type:'en', text: line });
+  }
+  return items;
+}
+
+function parseSameLine(raw) {
+  // Character name at start of line, followed by tab/spaces then dialogue
+  // e.g. "BONNIE\tWelcome to the rock" or "BONNIE  Welcome to the rock"
+  const items = [];
+  for (let i = 0; i < raw.length; i++) {
+    const line = raw[i];
+    
+    if (line.startsWith('@ACT')) { items.push({ type:'act', text: line.replace(/@ACT\s*/i,'').trim() }); continue; }
+    if (line.startsWith('@SONG')) { items.push({ type:'song', text: line.replace(/@SONG\s*/i,'').trim() }); continue; }
+    if (line.startsWith('@SCENE')) { items.push({ type:'scene', text: line.replace(/@SCENE\s*/i,'').trim() }); continue; }
+    if (/^ACT\s+(I{1,3}|V?I{0,3}|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)/i.test(line) && line.length < 40) {
+      items.push({ type:'act', text: line }); continue; }
+    if (/^SONG[:]/i.test(line)) { items.push({ type:'song', text: line.replace(/^SONG[:]\s*/i,'').trim() }); continue; }
+    
+    // Check for "CHARACTER  dialogue" pattern (tab or 3+ spaces between)
+    const tabMatch = line.match(/^([A-Z][A-Z\s&\/\d\-]+?)[\t\s]{3,}(.+)/);
+    if (tabMatch) {
+      const charName = tabMatch[1].trim();
+      const rest = tabMatch[2].trim();
+      items.push({ type:'char', text: charName });
+      const hasChinese = /[\u4e00-\u9fff]/.test(rest);
+      if (hasChinese && !/[a-zA-Z]/.test(rest)) items.push({ type:'cn', text: rest });
+      else items.push({ type:'en', text: rest });
+      continue;
+    }
+    
+    // Check for "CHARACTER: dialogue" pattern (colon followed by dialogue on same line)
+    const colonMatch = line.match(/^([A-Z][A-Z\s&\/\d\-\(\)]+?):\s+(.+)/);
+    if (colonMatch) {
+      const charName = colonMatch[1].trim();
+      const rest = colonMatch[2].trim();
+      items.push({ type:'char', text: charName });
+      const hasChinese = /[\u4e00-\u9fff]/.test(rest);
+      if (hasChinese && !/[a-zA-Z]/.test(rest)) items.push({ type:'cn', text: rest });
+      else items.push({ type:'en', text: rest });
+      continue;
+    }
+    
+    // Stage direction: bracketed
+    if (/^[\[\(（]/.test(line) || /[\]\)）]$/.test(line)) {
+      const clean = line.replace(/^[\[\(（]\s*/,'').replace(/\s*[\]\)）]$/,'');
+      items.push({ type:'sd', text: clean });
+      continue;
+    }
+    
+    // Dialogue
+    const hasChinese = /[\u4e00-\u9fff]/.test(line);
+    const hasEnglish = /[a-zA-Z]/.test(line);
+    if (hasChinese && !hasEnglish) items.push({ type:'cn', text: line });
+    else if (hasEnglish) items.push({ type:'en', text: line });
+  }
+  return items;
+}
+
+// Extract the internal logic of original parseToItems
+function parseToItemsInternal(raw) {
+  const items = [];
+  for (let i = 0; i < raw.length; i++) {
+    const line = raw[i];
+    if (line.startsWith('@ACT')) { items.push({ type:'act', text: line.replace(/@ACT\s*/i,'').trim() }); continue; }
+    if (line.startsWith('@SONG')) { items.push({ type:'song', text: line.replace(/@SONG\s*/i,'').trim() }); continue; }
+    if (line.startsWith('@SCENE')) { items.push({ type:'scene', text: line.replace(/@SCENE\s*/i,'').trim() }); continue; }
+    if (/^ACT\s+(I{1,3}|V?I{0,3}|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+|[一二三四五六七八九十]+)/i.test(line) && line.length < 40) {
+      items.push({ type:'act', text: line }); continue; }
+    if (/^SONG[:]\s*/i.test(line)) { items.push({ type:'song', text: line.replace(/^SONG[:]\s*/i,'').trim() }); continue; }
+    if (/^SCENE\s+\d+/i.test(line) && line.length < 40) { items.push({ type:'scene', text: line }); continue; }
+    if (/^[\[\(（]/.test(line) || /[\]\)）]$/.test(line) || /^[\[\(（].*[\]\)）]$/.test(line)) {
+      const clean = line.replace(/^[\[\(（]\s*/,'').replace(/\s*[\]\)）]$/,'');
+      items.push({ type:'sd', text: clean }); continue;
+    }
+    const isAllCaps = /^[A-Z\s&\/\.\d\-]+$/.test(line.replace(/:$/,'').trim());
+    const isTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*:?$/.test(line);
+    const endsWithColon = line.endsWith(':');
+    const lengthOk = line.length < 40;
+    if (lengthOk && (endsWithColon || isAllCaps || isTitleCase)) {
+      let isChar = false;
+      if (endsWithColon) { isChar = true; }
+      else if (isAllCaps && /^[A-Z]{2,}(\s+[A-Z]{2,})*$/.test(line)) {
+        const nextIdx = i + 1;
+        if (nextIdx < raw.length) {
+          const next = raw[nextIdx];
+          const nextIsEn = /[a-zA-Z]/.test(next) && !/[\u4e00-\u9fff]/.test(next);
+          const nextIsChar = /^[A-Z][A-Z\s&\/]+:?$/.test(next);
+          if (nextIsEn && !nextIsChar) isChar = true;
+        }
+      } else if (isTitleCase && endsWithColon) { isChar = true; }
+      if (isChar) { items.push({ type:'char', text: line.replace(/:$/,'').trim() }); continue; }
+    }
+    const hasChinese = /[\u4e00-\u9fff]/.test(line);
+    const hasEnglish = /[a-zA-Z]/.test(line);
+    if (hasChinese && !hasEnglish) { items.push({ type:'cn', text: line }); }
+    else if (hasEnglish) { items.push({ type:'en', text: line }); }
+  }
+  return items;
+}
+function parseToItems(text) {
+  return parseWithStrategy(text, currentStrategy);
+}
+
+// Convert flat items into show structure
+function itemsToShow(title, titleCn, items) {
+  const show = { title, titleCn, acts: [] };
+  let curAct = null, curScene = null;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type === 'act') {
+      curAct = { name: item.text, scenes: [] };
+      show.acts.push(curAct); curScene = null;
+    } else if (item.type === 'song') {
+      if (!curAct) { curAct = { name: 'Act 1', scenes: [] }; show.acts.push(curAct); }
+      curScene = { name: item.text, type: 'song', lines: [] };
+      curAct.scenes.push(curScene);
+    } else if (item.type === 'scene') {
+      if (!curAct) { curAct = { name: 'Act 1', scenes: [] }; show.acts.push(curAct); }
+      curScene = { name: item.text, type: 'dialogue', lines: [] };
+      curAct.scenes.push(curScene);
+    } else if (item.type === 'sd') {
+      if (!curAct) { curAct = { name: 'Act 1', scenes: [] }; show.acts.push(curAct); }
+      if (!curScene) { curScene = { name: '开场', type: 'dialogue', lines: [] }; curAct.scenes.push(curScene); }
+      curScene.lines.push({ type:'sd', text: item.text, en: item.text, cn: '' });
+    } else if (item.type === 'char') {
+      // Next EN items belong to this character until next char/type change
+      if (!curAct) { curAct = { name: 'Act 1', scenes: [] }; show.acts.push(curAct); }
+      if (!curScene) { curScene = { name: '开场', type: 'dialogue', lines: [] }; curAct.scenes.push(curScene); }
+      // Collect the dialogue that follows this character
+      const pairs = [];
+      let j = i + 1;
+      while (j < items.length) {
+        const n = items[j];
+        if (n.type === 'act' || n.type === 'song' || n.type === 'scene' || n.type === 'char' || n.type === 'sd') break;
+        if (n.type === 'en') {
+          // Check ahead for a CN partner
+          let cn = '';
+          if (j + 1 < items.length && items[j+1].type === 'cn') {
+            cn = items[j+1].text;
+            j++; // skip CN in next iteration
+          }
+          pairs.push({ type:'dialogue', char: item.text, en: n.text, cn, notes: '' });
+        } else if (n.type === 'cn') {
+          pairs.push({ type:'dialogue', char: item.text, en: '', cn: n.text, notes: '' });
+        }
+        j++;
+      }
+      curScene.lines.push(...pairs);
+      i = j - 1;
+    } else if (item.type === 'en') {
+      // Plain EN without character
+      if (!curAct) { curAct = { name: 'Act 1', scenes: [] }; show.acts.push(curAct); }
+      if (!curScene) { curScene = { name: '开场', type: 'dialogue', lines: [] }; curAct.scenes.push(curScene); }
+      let cn = '';
+      if (i + 1 < items.length && items[i+1].type === 'cn') {
+        cn = items[i+1].text;
+        i++; // skip the CN
+      }
+      curScene.lines.push({ type:'dialogue', char: '', en: item.text, cn, notes: '' });
+    } else if (item.type === 'cn') {
+      // Unpaired Chinese
+      if (!curAct) { curAct = { name: 'Act 1', scenes: [] }; show.acts.push(curAct); }
+      if (!curScene) { curScene = { name: '开场', type: 'dialogue', lines: [] }; curAct.scenes.push(curScene); }
+      curScene.lines.push({ type:'dialogue', char: '', en: '', cn: item.text, notes: '' });
+    }
+  }
+
+  return show;
+}
+
+// ====================================================================
+//  PARSE PREVIEW
+// ====================================================================
+function previewImport(title, titleCn, text) {
+  const items = parseToItems(text);
+  if (!items.length) { t('没有解析到内容'); return; }
+
+  pendingShow = { title, titleCn, items };
+
+  const list = document.getElementById('previewList');
+  const stats = document.getElementById('previewStats');
+
+  const counts = {};
+  items.forEach(it => { counts[it.type] = (counts[it.type]||0) + 1; });
+  stats.innerHTML = `共 ${items.length} 行 · 📂 ${counts.act||0} 幕 · 🎵 ${counts.song||0} 歌曲 · 🎭 ${counts.char||0} 角色 · 💬 ${(counts.en||0)+(counts.cn||0)} 对白 · 📋 ${counts.sd||0} 舞台指示`;
+
+  list.innerHTML = items.map((item, idx) => {
+    const labels = {
+      act: { label:'📂 幕', cls:'tag-act' },
+      song: { label:'🎵 歌曲', cls:'tag-song' },
+      scene: { label:'🎭 场景', cls:'tag-scene' },
+      char: { label:'🎭 角色', cls:'tag-char' },
+      en: { label:'💬 英文', cls:'tag-en' },
+      cn: { label:'🌏 中文', cls:'tag-cn' },
+      sd: { label:'📋 指示', cls:'tag-sd' },
+    };
+    const l = labels[item.type] || { label:'?', cls:'' };
+    const needsConfirm = item.type === 'char' && !item.text.endsWith(':');
+
+    return `<div class="pv-item">
+      <span class="tag ${l.cls}">${l.label}</span>
+      <span class="txt" style="${needsConfirm?'color:#fbbf24':''}">${esc(item.text)}${needsConfirm ? ' 🟡' : ''}</span>
+      <div class="act">
+        <button onclick="changeType(${idx},'char')" ${item.type==='char'?'class="cur"':''}>角色</button>
+        <button onclick="changeType(${idx},'en')" ${item.type==='en'?'class="cur"':''}>英文</button>
+        <button onclick="changeType(${idx},'cn')" ${item.type==='cn'?'class="cur"':''}>中文</button>
+        <button onclick="changeType(${idx},'sd')" ${item.type==='sd'?'class="cur"':''}>指示</button>
+        <button onclick="changeType(${idx},'act')" ${item.type==='act'?'class="cur"':''}>幕</button>
+        <button onclick="changeType(${idx},'song')" ${item.type==='song'?'class="cur"':''}>歌曲</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('previewMo').classList.add('a');
+}
+
+function changeType(idx, newType) {
+  if (!pendingShow) return;
+  pendingShow.items[idx].type = newType;
+  // Re-render preview
+  const items = pendingShow.items;
+  const list = document.getElementById('previewList');
+  const labels = {
+    act: { label:'📂 幕', cls:'tag-act' },
+    song: { label:'🎵 歌曲', cls:'tag-song' },
+    scene: { label:'🎭 场景', cls:'tag-scene' },
+    char: { label:'🎭 角色', cls:'tag-char' },
+    en: { label:'💬 英文', cls:'tag-en' },
+    cn: { label:'🌏 中文', cls:'tag-cn' },
+    sd: { label:'📋 指示', cls:'tag-sd' },
+  };
+  list.innerHTML = items.map((item, i) => {
+    const l = labels[item.type] || { label:'?', cls:'' };
+    return `<div class="pv-item">
+      <span class="tag ${l.cls}">${l.label}</span>
+      <span class="txt">${esc(item.text)}</span>
+      <div class="act">
+        <button onclick="changeType(${i},'char')" ${item.type==='char'?'class="cur"':''}>角色</button>
+        <button onclick="changeType(${i},'en')" ${item.type==='en'?'class="cur"':''}>英文</button>
+        <button onclick="changeType(${i},'cn')" ${item.type==='cn'?'class="cur"':''}>中文</button>
+        <button onclick="changeType(${i},'sd')" ${item.type==='sd'?'class="cur"':''}>指示</button>
+        <button onclick="changeType(${i},'act')" ${item.type==='act'?'class="cur"':''}>幕</button>
+        <button onclick="changeType(${i},'song')" ${item.type==='song'?'class="cur"':''}>歌曲</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function confirmImport() {
+  if (!pendingShow) return;
+  const show = itemsToShow(pendingShow.title, pendingShow.titleCn, pendingShow.items);
+  if (!show.acts.length) { t('没有有效内容'); return; }
+  data.shows.push(show);
+  save();
+  closeMo('previewMo');
+  pendingShow = null;
+  renderHome();
+  t(`✅ 已导入「${show.title}」`);
+}
+
+// ====================================================================
+//  FILE HANDLER (docx + pdf)
+// ====================================================================
+async function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  currentStrategy = getStrategy();
+  
+  if (file.name.endsWith('.pdf')) {
+    t('正在解析 PDF...');
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let textContent = '';
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        textContent += pageText + '\n';
+      }
+      
+      const title = file.name.replace(/\.pdf$/i, '');
+      previewImport(title, '', textContent);
+      
+    } catch(e) {
+      t('PDF 解析失败: ' + e.message);
+      console.error(e);
+    }
+    e.target.value = '';
+    return;
+  }
+  
+  // .docx handler (original)
+  t('正在解析 Word 文档...');
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const docXml = await zip.file('word/document.xml').async('text');
+    const xml = new DOMParser().parseFromString(docXml, 'text/xml');
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+    const paragraphs = xml.getElementsByTagNameNS('*', 'p');
+    let textContent = '';
+
+    for (const p of paragraphs) {
+      const texts = p.getElementsByTagNameNS(ns, 't');
+      let text = '';
+      for (const t of texts) text += t.textContent;
+      text = text.trim();
+      if (!text) continue;
+
+      // Check italic (stage directions are often italic)
+      let isItalic = false;
+      const runs = p.getElementsByTagNameNS(ns, 'r');
+      for (const r of runs) {
+        const rPr = r.getElementsByTagNameNS(ns, 'rPr')[0];
+        if (!rPr) continue;
+        if (rPr.getElementsByTagNameNS(ns, 'i')[0]) { isItalic = true; break; }
+      }
+
+      if (isItalic || text.startsWith('(') || text.startsWith('[')) {
+        textContent += '[' + text + ']\n';
+      } else {
+        textContent += text + '\n';
+      }
+    }
+
+    const title = file.name.replace(/\.docx$/i, '');
+    previewImport(title, '', textContent);
+
+  } catch(e) {
+    t('解析失败: ' + e.message);
+    console.error(e);
+  }
+  e.target.value = '';
+}
+
+// ====================================================================
+//  HOME
+// ====================================================================
+function renderHome() {
+  const g = document.getElementById('showGrid');
+  if (!data.shows.length) {
+    g.innerHTML = '<div style="text-align:center;padding:40px;color:#555;">还没有剧目，上传一个 Word 文档开始吧</div>';
+    return;
+  }
+  g.innerHTML = data.shows.map((s,i) => {
+    const total = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type!=='sd').length||0),0),0);
+    const missing = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='dialogue'&&!l.cn).length||0),0),0);
+    return `<div class="sc" onclick="openShow(${i})">
+      <h3>${esc(s.title)}</h3>
+      <div class="m">${s.acts.length} 幕 · ${total} 条对白</div>
+      ${missing ? `<div class="badge badge-warn">⚠️ ${missing} 缺翻译</div>` : `<div class="badge badge-ok">✓ 完整</div>`}
+    </div>`;
+  }).join('');
+}
+
+function openShow(i) { curShow = i; page('p-show'); renderShow(); }
+
+// ====================================================================
+//  TEXT IMPORT
+// ====================================================================
+function showTextImport() {
+  document.getElementById('tiTitle').value = '';
+  document.getElementById('tiTitleCn').value = '';
+  document.getElementById('tiContent').value = '';
+  document.getElementById('textImportMo').classList.add('a');
+}
+
+function previewTextImport() {
+  const title = document.getElementById('tiTitle').value.trim() || '未命名';
+  const titleCn = document.getElementById('tiTitleCn').value.trim();
+  const content = document.getElementById('tiContent').value;
+  if (!content.trim()) { t('请输入剧本内容'); return; }
+  closeMo('textImportMo');
+  previewImport(title, titleCn, content);
+}
+
+// ====================================================================
+//  MANUAL CREATE
+// ====================================================================
+function showManualCreate() {
+  document.getElementById('mcTitle').value = '';
+  document.getElementById('mcTitleCn').value = '';
+  document.getElementById('mcMo').classList.add('a');
+}
+function manualCreate() {
+  const t2 = document.getElementById('mcTitle').value.trim();
+  if (!t2) { t('请输入剧名'); return; }
+  data.shows.push({ title: t2, titleCn: document.getElementById('mcTitleCn').value.trim(), acts: [] });
+  save(); closeMo('mcMo'); renderHome(); t('已创建');
+}
+
+// ====================================================================
+//  SHOW DETAIL
+// ====================================================================
+function gs() { return data.shows[curShow]; }
+
+function renderShow() {
+  const s = gs(); if (!s) { navHome(); return; }
+  document.getElementById('showTitle').textContent = s.title;
+  document.getElementById('showTitleCn').textContent = s.titleCn || '';
+
+  const total = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type!=='sd').length||0),0),0);
+  const missing = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='dialogue'&&!l.cn).length||0),0),0);
+  const sd = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='sd').length||0),0),0);
+  document.getElementById('showTB').innerHTML = `
+    <span class="st">🎭 <span>${s.acts.length}</span> 幕</span>
+    <span class="st">📝 <span>${s.acts.reduce((a,act) => a + act.scenes.length,0)}</span> 段</span>
+    <span class="st">💬 <span>${total}</span> 条对白</span>
+    <span class="st">📋 <span>${sd}</span> 条指示</span>
+    ${missing ? `<span class="st" style="color:#fbbf24;">⚠️ <span>${missing}</span> 缺翻译</span>` : ''}
+  `;
+
+  document.getElementById('translateBtn').style.display = missing ? '' : 'none';
+
+  const c = document.getElementById('actsContainer');
+  c.innerHTML = s.acts.map((act, ai) => {
+    const scenes = (act.scenes||[]).map((sc, si) => {
+      const lines = (sc.lines||[]).filter(l => l.type !== 'sd').length;
+      const miss = (sc.lines||[]).filter(l => l.type === 'dialogue' && !l.cn).length;
+      return `<div class="scn" onclick="openScene(${ai},${si})">
+        <div class="nm">${esc(sc.name)}</div>
+        <span class="sty ${sc.type||'dl'}">${sc.type==='song'?'🎵 歌曲':'🎭 对白'}</span>
+        <span style="color:#555;font-size:11px;">${lines}条${miss ? ` · 缺${miss}` : ''}</span>
+        <button class="btn-d btn-sm" onclick="event.stopPropagation();dScene(${ai},${si})">✕</button>
+      </div>`;
+    }).join('') || '<div style="color:#555;padding:8px;font-size:13px;">暂无段落</div>';
+
+    return `<div class="act">
+      <div class="ah">
+        <h3>${esc(act.name)}</h3>
+        <button class="btn-s btn-sm" onclick="event.stopPropagation();addScene(${ai})">＋段落</button>
+        <button class="btn-d btn-sm" onclick="event.stopPropagation();dAct(${ai})">✕</button>
+      </div>
+      ${scenes}
+    </div>`;
+  }).join('');
+}
+
+function addScene(ai) {
+  const n = prompt('段落名：'); if (!n) return;
+  const isSong = confirm('是歌曲吗？\n确定=歌曲 🎵   取消=对白 🎭');
+  gs().acts[ai].scenes.push({ name: n, type: isSong ? 'song' : 'dialogue', lines: [] });
+  save(); renderShow();
+}
+function dAct(ai) { if (!confirm('删除？')) return; gs().acts.splice(ai,1); save(); renderShow(); }
+function dScene(ai,si) { if (!confirm('删除？')) return; gs().acts[ai].scenes.splice(si,1); save(); renderShow(); }
+function delShow() { if (!confirm('删除此剧目？')) return; data.shows.splice(curShow,1); save(); navHome(); }
+
+function renameShow() {
+  const s = gs(); if (!s) return;
+  document.getElementById('reTitle').value = s.title;
+  document.getElementById('reTitleCn').value = s.titleCn || '';
+  document.getElementById('renameMo').classList.add('a');
+}
+
+function saveRename() {
+  const s = gs(); if (!s) return;
+  const newTitle = document.getElementById('reTitle').value.trim();
+  if (!newTitle) { t('请输入剧名'); return; }
+  s.title = newTitle;
+  s.titleCn = document.getElementById('reTitleCn').value.trim();
+  save();
+  closeMo('renameMo');
+  renderShow();
+  t('已更新');
+}
+function navHome() { page('p-home'); renderHome(); }
+function navShow() { page('p-show'); renderShow(); }
+
+// ====================================================================
+//  SCENE EDITOR
+// ====================================================================
+function openScene(ai, si) {
+  curAct = ai; curScene = si;
+  page('p-scene');
+  const sc = gs().acts[ai].scenes[si];
+  document.getElementById('sceneLabel').textContent = `${gs().acts[ai].name} → ${sc.name} (${sc.type==='song'?'🎵':'🎭'})`;
+  document.getElementById('lineSearch').value = '';
+  renderLines();
+}
+
+function renderLines() {
+  const sc = gs()?.acts[curAct]?.scenes[curScene];
+  if (!sc) { document.getElementById('linesContainer').innerHTML = ''; return; }
+  const q = document.getElementById('lineSearch').value.toLowerCase().trim();
+  const lines = q ? sc.lines.filter(l => (l.en||'').toLowerCase().includes(q) || (l.cn||'').includes(q) || (l.text||'').includes(q) || (l.char||'').toLowerCase().includes(q)) : sc.lines;
+  const total = sc.lines.length;
+  const missing = sc.lines.filter(l => l.type === 'dialogue' && !l.cn).length;
+  document.getElementById('sceneLineStats').textContent = `${total}条${missing ? ` · 缺${missing}翻译` : ''}`;
+  
+  let html = '';
+  // Insert button before first line
+  if (!q) html += `<div class="li-insert" onclick="insertLine(0)" title="在此处插入">＋</div>`;
+  
+  lines.forEach((l, i) => {
+    const ri = sc.lines.indexOf(l);
+    if (l.type === 'sd') {
+      html += `<div class="li">
+        <div class="n">${ri+1}</div>
+        <div class="tx"><div class="sd">📋 ${esc(l.text||l.en||'')}</div></div>
+        <div class="ac">
+          <button onclick="openLineEditor(${ri})" title="编辑">✏️</button>
+          <button onclick="moveLine(${ri},-1)" title="上移">↑</button>
+          <button onclick="moveLine(${ri},1)" title="下移">↓</button>
+          <button onclick="dLine(${ri})" title="删除">🗑</button>
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="li ${l.cn?'':'ms'}">
+        <div class="n">${ri+1}</div>
+        <div class="tx">
+          ${l.char ? `<div class="ch">${esc(l.char)}</div>` : ''}
+          <div class="e">${esc(l.en||'')}</div>
+          <div class="c ${l.cn?'':'ms'}">${l.cn ? esc(l.cn) : '⚠️ 缺翻译'}</div>
+        </div>
+        <div class="ac">
+          <button onclick="openLineEditor(${ri})" title="编辑">✏️</button>
+          <button onclick="moveLine(${ri},-1)" title="上移">↑</button>
+          <button onclick="moveLine(${ri},1)" title="下移">↓</button>
+          <button onclick="dLine(${ri})" title="删除">🗑</button>
+        </div>
+      </div>`;
+    }
+    // Insert button after each line
+    if (!q) html += `<div class="li-insert" onclick="insertLine(${ri + 1})" title="在此处插入">＋</div>`;
+  });
+  
+  document.getElementById('linesContainer').innerHTML = html;
+}
+
+// ====================================================================
+//  LINE EDITOR (modal-based, replaces old prompt-based editLine)
+// ====================================================================
+let editingLineIdx = -1;
+let editingInsertAt = -1; // -1 = normal edit/add, >=0 = insert at position
+
+function insertLine(atIndex) {
+  editingInsertAt = atIndex;
+  openLineEditor(-1);
+}
+
+function openLineEditor(idx) {
+  editingLineIdx = idx;
+  const sc = gs()?.acts[curAct]?.scenes[curScene];
+  if (!sc) return;
+  
+  if (idx === -1) {
+    // Adding new line
+    const insertMode = editingInsertAt >= 0;
+    document.getElementById('leTitle').textContent = insertMode ? '➕ 插入对白' : '➕ 添加对白';
+    document.getElementById('leChar').value = '';
+    document.getElementById('leEn').value = '';
+    document.getElementById('leCn').value = '';
+    document.getElementById('leSd').value = '';
+    setLineType('dialogue');
+  } else {
+    // Editing existing line
+    editingInsertAt = -1; // clear insert mode
+    const l = sc.lines[idx];
+    if (l.type === 'sd') {
+      setLineType('sd');
+      document.getElementById('leSd').value = l.text || l.en || '';
+      document.getElementById('leChar').value = '';
+      document.getElementById('leEn').value = '';
+      document.getElementById('leCn').value = '';
+      document.getElementById('leTitle').textContent = `✏️ 编辑舞台指示 #${idx+1}`;
+    } else {
+      setLineType('dialogue');
+      document.getElementById('leChar').value = l.char || '';
+      document.getElementById('leEn').value = l.en || '';
+      document.getElementById('leCn').value = l.cn || '';
+      document.getElementById('leSd').value = '';
+      document.getElementById('leTitle').textContent = `✏️ 编辑对白 #${idx+1}`;
+    }
+  }
+  document.getElementById('lineEditorMo').classList.add('a');
+}
+
+function setLineType(type) {
+  const isDl = type === 'dialogue';
+  document.getElementById('leDialogueFields').style.display = isDl ? '' : 'none';
+  document.getElementById('leSdField').style.display = isDl ? 'none' : '';
+  const dlBtn = document.getElementById('leTypeDialogue');
+  const sdBtn = document.getElementById('leTypeSd');
+  dlBtn.style.background = isDl ? '#2563eb' : '#333';
+  dlBtn.style.color = isDl ? '#fff' : '#ccc';
+  sdBtn.style.background = isDl ? '#333' : '#2563eb';
+  sdBtn.style.color = isDl ? '#ccc' : '#fff';
+}
+
+function saveLineEditor() {
+  const sc = gs()?.acts[curAct]?.scenes[curScene];
+  if (!sc) return;
+  
+  const isSd = document.getElementById('leSdField').style.display !== 'none';
+  
+  if (isSd) {
+    const sdText = document.getElementById('leSd').value.trim();
+    if (!sdText) { t('请输入舞台指示内容'); return; }
+    const lineData = { type: 'sd', text: sdText, en: sdText, cn: '' };
+    if (editingLineIdx === -1) {
+      if (editingInsertAt >= 0) {
+        sc.lines.splice(editingInsertAt, 0, lineData);
+      } else {
+        sc.lines.push(lineData);
+      }
+    } else {
+      sc.lines[editingLineIdx] = lineData;
+    }
+  } else {
+    const charName = document.getElementById('leChar').value.trim();
+    const en = document.getElementById('leEn').value.trim();
+    const cn = document.getElementById('leCn').value.trim();
+    if (!en) { t('请输入英文对白'); return; }
+    const lineData = { type: 'dialogue', char: charName, en, cn, notes: '' };
+    if (editingLineIdx === -1) {
+      if (editingInsertAt >= 0) {
+        sc.lines.splice(editingInsertAt, 0, lineData);
+      } else {
+        sc.lines.push(lineData);
+      }
+    } else {
+      sc.lines[editingLineIdx] = lineData;
+    }
+  }
+  
+  editingInsertAt = -1;
+  save();
+  closeMo('lineEditorMo');
+  renderLines();
+  t('已保存');
+}
+
+function moveLine(idx, direction) {
+  const sc = gs()?.acts[curAct]?.scenes[curScene];
+  if (!sc) return;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= sc.lines.length) return;
+  // Swap
+  const temp = sc.lines[idx];
+  sc.lines[idx] = sc.lines[newIdx];
+  sc.lines[newIdx] = temp;
+  save();
+  renderLines();
+}
+
+function dLine(idx) {
+  if (!confirm('删除这条对白？')) return;
+  gs().acts[curAct].scenes[curScene].lines.splice(idx,1);
+  save();
+  renderLines();
+}
+
+// ====================================================================
+//  CHARACTER DIALOGUE VIEWER
+// ====================================================================
+let selectedChar = null;
+let charView = 'chars'; // 'chars' or 'actors'
+
+function showCharDialog() {
+  selectedChar = null;
+  charView = 'chars';
+  document.getElementById('charViewChars').style.background = '#2563eb';
+  document.getElementById('charViewChars').style.color = '#fff';
+  document.getElementById('charViewActors').style.background = '#333';
+  document.getElementById('charViewActors').style.color = '#ccc';
+  document.getElementById('charSearch').value = '';
+  document.getElementById('charMo').classList.add('a');
+  renderCharList();
+  document.getElementById('charLines').innerHTML = '<div style="color:#555;text-align:center;padding:40px;">👆 点击上方查看台词</div>';
+}
+
+function setCharView(view) {
+  charView = view;
+  selectedChar = null;
+  const isChars = view === 'chars';
+  document.getElementById('charViewChars').style.background = isChars ? '#2563eb' : '#333';
+  document.getElementById('charViewChars').style.color = isChars ? '#fff' : '#ccc';
+  document.getElementById('charViewActors').style.background = isChars ? '#333' : '#2563eb';
+  document.getElementById('charViewActors').style.color = isChars ? '#ccc' : '#fff';
+  document.getElementById('charSearch').value = '';
+  renderCharList();
+  document.getElementById('charLines').innerHTML = '<div style="color:#555;text-align:center;padding:40px;">👆 点击上方查看台词</div>';
+}
+
+function renderCharList() {
+  const s = gs(); if (!s) return;
+  const q = document.getElementById('charSearch').value.trim().toLowerCase();
+  
+  if (charView === 'actors') {
+    renderActorList(q);
+    return;
+  }
+  
+  // Character view - all unique character names
+  const charCounts = {};
+  s.acts.forEach(act => {
+    act.scenes.forEach(sc => {
+      (sc.lines||[]).forEach(l => {
+        if (l.type === 'dialogue' && l.char) {
+          const names = l.char.split('/').map(n => n.trim()).filter(Boolean);
+          names.forEach(n => {
+            if (!charCounts[n]) charCounts[n] = { count: 0 };
+            charCounts[n].count++;
+          });
+        }
+      });
+    });
+  });
+  
+  const chars = Object.keys(charCounts).sort();
+  const filtered = q ? chars.filter(c => c.toLowerCase().includes(q)) : chars;
+  
+  document.getElementById('charTotal').textContent = `共 ${filtered.length} 个角色`;
+  
+  const list = document.getElementById('charList');
+  list.innerHTML = filtered.map(name => {
+    const isSelected = selectedChar === name;
+    // Check if this character is assigned to an actor
+    const actorInfo = s.actors ? Object.entries(s.actors).find(([_, a]) => a.chars.includes(name)) : null;
+    const actorLabel = actorInfo ? ` <span style="color:#888;font-size:10px;">→ ${esc(actorInfo[0])}</span>` : '';
+    return `<button class="btn-sm" style="${isSelected ? 'background:#2563eb;color:#fff;' : 'background:#222;color:#ccc;'}border:1px solid ${isSelected ? '#2563eb' : '#333'};margin:2px;"
+      onclick="selectChar('${esc(name)}')">${esc(name)} <span style="opacity:.6;font-size:10px;">(${charCounts[name].count})</span>${actorLabel}</button>`;
+  }).join('');
+  
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="color:#555;padding:10px;">没有匹配的角色</div>';
+  }
+}
+
+function renderActorList(q) {
+  const s = gs(); if (!s) return;
+  const actors = s.actors || {};
+  const actorNames = Object.keys(actors).sort();
+  
+  // Also find unassigned characters
+  const allChars = new Set();
+  s.acts.forEach(act => act.scenes.forEach(sc => (sc.lines||[]).forEach(l => {
+    if (l.type === 'dialogue' && l.char) {
+      l.char.split('/').map(n => n.trim()).filter(Boolean).forEach(n => allChars.add(n));
+    }
+  })));
+  
+  const assigned = new Set();
+  Object.values(actors).forEach(a => (a.chars||[]).forEach(c => assigned.add(c)));
+  const unassigned = [...allChars].filter(c => !assigned.has(c)).sort();
+  
+  const allActors = [...actorNames, ...(unassigned.length ? ['__unassigned__'] : [])];
+  const filtered = q ? allActors.filter(a => a === '__unassigned__' ? '未分配'.includes(q) : a.toLowerCase().includes(q) || (actors[a].chars||[]).some(c => c.toLowerCase().includes(q))) : allActors;
+  
+  document.getElementById('charTotal').textContent = `${actorNames.length} 位演员${unassigned.length ? ` · ${unassigned.length} 个角色未分配` : ''}`;
+  
+  const list = document.getElementById('charList');
+  list.innerHTML = filtered.map(name => {
+    if (name === '__unassigned__') {
+      const isSelected = selectedChar === '__unassigned__';
+      return `<button class="btn-sm" style="${isSelected ? 'background:#d97706;color:#fff;' : 'background:#222;color:#ccc;'}border:1px solid ${isSelected ? '#d97706' : '#555'};margin:2px;"
+        onclick="selectChar('__unassigned__')">📦 未分配 <span style="opacity:.6;font-size:10px;">(${unassigned.length})</span></button>`;
+    }
+    const a = actors[name];
+    const count = a.chars.reduce((sum, c) => sum + countCharLines(s, c), 0);
+    const isSelected = selectedChar === name;
+    return `<button class="btn-sm" style="${isSelected ? 'background:#2563eb;color:#fff;' : 'background:#222;color:#ccc;'}border:1px solid ${isSelected ? '#2563eb' : '#333'};margin:2px;"
+      onclick="selectChar('${esc(name)}')">${esc(name)} <span style="opacity:.6;font-size:10px;">(${count})</span></button>`;
+  }).join('');
+  
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="color:#555;padding:10px;">没有匹配</div>';
+  }
+}
+
+function countCharLines(s, charName) {
+  let count = 0;
+  s.acts.forEach(act => act.scenes.forEach(sc => (sc.lines||[]).forEach(l => {
+    if (l.type === 'dialogue' && l.char && l.char.split('/').map(n => n.trim()).includes(charName)) count++;
+  })));
+  return count;
+}
+
+function selectChar(name) {
+  selectedChar = name;
+  renderCharList();
+  
+  const s = gs(); if (!s) return;
+  const container = document.getElementById('charLines');
+  
+  if (charView === 'actors' && name === '__unassigned__') {
+    // Show unassigned characters
+    const actors = s.actors || {};
+    const assigned = new Set();
+    Object.values(actors).forEach(a => (a.chars||[]).forEach(c => assigned.add(c)));
+    
+    const unassignedChars = [];
+    s.acts.forEach(act => act.scenes.forEach(sc => (sc.lines||[]).forEach(l => {
+      if (l.type === 'dialogue' && l.char) {
+        l.char.split('/').map(n => n.trim()).filter(Boolean).forEach(n => {
+          if (!assigned.has(n) && !unassignedChars.includes(n)) unassignedChars.push(n);
+        });
+      }
+    })));
+    
+    let html = `<div style="padding:8px 12px;background:#7c2d12;border-radius:8px;margin-bottom:12px;">
+      <strong style="color:#fdba74;font-size:16px;">📦 未分配角色</strong>
+      <span style="color:#888;font-size:12px;margin-left:8px;">${unassignedChars.length} 个角色还没有分配到演员</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+    unassignedChars.forEach(c => {
+      const count = countCharLines(s, c);
+      html += `<span style="background:#222;padding:4px 10px;border-radius:6px;font-size:13px;color:#ccc;">${esc(c)} <span style="color:#666;font-size:11px;">(${count})</span></span>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+  
+  if (charView === 'actors') {
+    // Actor view - show combined lines across all their characters
+    const actors = s.actors || {};
+    const actorData = actors[name];
+    if (!actorData || !actorData.chars.length) {
+      container.innerHTML = '<div style="color:#555;text-align:center;padding:20px;">该演员没有分配角色</div>';
+      return;
+    }
+    
+    let html = `<div style="padding:8px 12px;background:#1a1a2e;border-radius:8px;margin-bottom:12px;">
+      <strong style="color:#fdba74;font-size:16px;">${esc(name)}</strong>
+      <span style="color:#888;font-size:12px;margin-left:8px;">饰演：${actorData.chars.map(c => esc(c)).join(' · ')}</span>
+    </div>`;
+    
+    let totalLines = 0;
+    let missingCn = 0;
+    
+    s.acts.forEach((act, ai) => {
+      act.scenes.forEach((sc, si) => {
+        const lines = (sc.lines||[]).reduce((acc, l, li) => {
+          if (l.type === 'dialogue' && l.char && actorData.chars.some(c => l.char.split('/').map(n => n.trim()).includes(c))) {
+            acc.push({ line: l, li: li });
+          }
+          return acc;
+        }, []);
+        if (!lines.length) return;
+        
+        totalLines += lines.length;
+        missingCn += lines.filter(({line}) => !line.cn).length;
+        
+        // Show which character is speaking for each line if actor plays multiple
+        const multiChar = actorData.chars.length > 1;
+        
+        html += `<div style="margin-bottom:10px;">
+          <div style="font-size:11px;color:#555;padding:4px 8px;background:#151515;border-radius:4px;margin-bottom:4px;">
+            🎬 ${esc(act.name)} → ${sc.type === 'song' ? '🎵' : '🎭'} ${esc(sc.name)}
+          </div>`;
+        
+        lines.forEach(({line, li}) => {
+          html += `<div style="display:flex;gap:6px;align-items:start;padding:4px 8px;border-left:2px solid ${line.cn ? '#333' : '#f59e0b'};margin-bottom:2px;">
+            <div style="flex:1;min-width:0;">
+              ${multiChar ? `<div style="color:#fdba74;font-size:11px;">${esc(line.char)}</div>` : ''}
+              <div style="color:#ddd;font-size:13px;">${esc(line.en || '')}</div>
+              <div style="color:${line.cn ? '#6af' : '#f59e0b'};font-size:13px;">${line.cn ? esc(line.cn) : '⚠️ 缺翻译'}</div>
+            </div>
+            <button class="btn-sm" style="flex-shrink:0;padding:2px 6px;font-size:10px;background:#222;color:#6af;border:1px solid #333;border-radius:4px;cursor:pointer;" 
+              onclick="locateLine(${ai},${si},${li})" title="定位到原文">📌</button>
+          </div>`;
+        });
+        
+        html += `</div>`;
+      });
+    });
+    
+    if (totalLines === 0) {
+      html += '<div style="color:#555;text-align:center;padding:20px;">该演员没有台词</div>';
+    } else {
+      html += `<div style="padding:8px 12px;background:#111;border-radius:8px;font-size:12px;color:#666;">
+        共 ${totalLines} 句台词${missingCn ? ` · ⚠️ ${missingCn} 句缺翻译` : ''}
+      </div>`;
+    }
+    
+    container.innerHTML = html;
+    return;
+  }
+  
+  // === CHARACTER VIEW (existing code, unchanged) ===
+  let html = `<div style="padding:8px 12px;background:#1a1a2e;border-radius:8px;margin-bottom:12px;">
+    <strong style="color:#fdba74;font-size:16px;">${esc(name)}</strong>
+    <span style="color:#888;font-size:12px;margin-left:8px;">的全部台词</span>
+  </div>`;
+  
+  let totalLines = 0;
+  let missingCn = 0;
+  
+  s.acts.forEach((act, ai) => {
+    act.scenes.forEach((sc, si) => {
+      const lines = (sc.lines||[]).reduce((acc, l, li) => {
+        if (l.type === 'dialogue' && l.char && l.char.split('/').map(n => n.trim()).includes(name)) {
+          acc.push({ line: l, li: li });
+        }
+        return acc;
+      }, []);
+      if (!lines.length) return;
+      
+      totalLines += lines.length;
+      missingCn += lines.filter(({line}) => !line.cn).length;
+      
+      html += `<div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#555;padding:4px 8px;background:#151515;border-radius:4px;margin-bottom:4px;">
+          🎬 ${esc(act.name)} → ${sc.type === 'song' ? '🎵' : '🎭'} ${esc(sc.name)}
+        </div>`;
+      
+      lines.forEach(({line, li}) => {
+        html += `<div style="display:flex;gap:6px;align-items:start;padding:4px 8px;border-left:2px solid ${line.cn ? '#333' : '#f59e0b'};margin-bottom:2px;">
+          <div style="flex:1;min-width:0;">
+            <div style="color:#ddd;font-size:13px;">${esc(line.en || '')}</div>
+            <div style="color:${line.cn ? '#6af' : '#f59e0b'};font-size:13px;">${line.cn ? esc(line.cn) : '⚠️ 缺翻译'}</div>
+          </div>
+          <button class="btn-sm" style="flex-shrink:0;padding:2px 6px;font-size:10px;background:#222;color:#6af;border:1px solid #333;border-radius:4px;cursor:pointer;" 
+            onclick="locateLine(${ai},${si},${li})" title="定位到原文">📌</button>
+        </div>`;
+      });
+      
+      html += `</div>`;
+    });
+  });
+  
+  if (totalLines === 0) {
+    html += '<div style="color:#555;text-align:center;padding:20px;">该角色没有台词</div>';
+  } else {
+    html += `<div style="padding:8px 12px;background:#111;border-radius:8px;font-size:12px;color:#666;">
+      共 ${totalLines} 句台词${missingCn ? ` · ⚠️ ${missingCn} 句缺翻译` : ''}
+    </div>`;
+  }
+  
+  container.innerHTML = html;
+}
+
+function locateLine(ai, si, li) {
+  closeMo('charMo');
+  curAct = ai; curScene = si;
+  page('p-scene');
+  const sc = gs().acts[ai].scenes[si];
+  document.getElementById('sceneLabel').textContent = `${gs().acts[ai].name} → ${sc.name} (${sc.type==='song'?'🎵':'🎭'})`;
+  document.getElementById('lineSearch').value = '';
+  renderLines();
+  setTimeout(() => {
+    const container = document.getElementById('linesContainer');
+    const lineEls = container.querySelectorAll('.li');
+    if (lineEls[li]) {
+      lineEls[li].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      lineEls[li].style.borderLeft = '3px solid #2563eb';
+      lineEls[li].style.background = 'rgba(37,99,235,.08)';
+      setTimeout(() => {
+        lineEls[li].style.borderLeft = lineEls[li].classList.contains('ms') ? '3px solid #f59e0b' : '3px solid #333';
+        lineEls[li].style.background = '';
+      }, 2000);
+    }
+  }, 100);
+}
+
+  // ====================================================================
+  //  ACTOR MANAGEMENT
+  // ====================================================================
+  function showActorManager() {
+    document.getElementById('actorMo').classList.add('a');
+    renderActorManager();
+  }
+
+  function renderActorManager() {
+    const s = gs(); if (!s) return;
+    if (!s.actors) s.actors = {};
+  
+    // Collect all unique character names from the script
+    const allChars = new Set();
+    s.acts.forEach(act => act.scenes.forEach(sc => (sc.lines||[]).forEach(l => {
+      if (l.type === 'dialogue' && l.char) {
+        l.char.split('/').map(n => n.trim()).filter(Boolean).forEach(n => allChars.add(n));
+      }
+    })));
+    const charList = [...allChars].sort();
+  
+    const container = document.getElementById('actorList');
+    const actors = s.actors;
+    const actorNames = Object.keys(actors);
+  
+    let html = '';
+  
+    if (!actorNames.length && !charList.length) {
+      container.innerHTML = '<div style="color:#555;text-align:center;padding:20px;">还没有角色数据，先导入剧本</div>';
+      return;
+    }
+  
+    // Show each actor
+    actorNames.forEach(name => {
+      const a = actors[name];
+      const assignedCount = (a.chars||[]).length;
+      const totalLines = (a.chars||[]).reduce((sum, c) => sum + countCharLines(s, c), 0);
+    
+      html += `<div style="background:#151515;border:1px solid #222;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+          <strong style="color:#fdba74;font-size:15px;">${esc(name)}</strong>
+          <span style="color:#666;font-size:11px;">${assignedCount} 个角色 · ${totalLines} 句台词</span>
+          <div style="flex:1;"></div>
+          <button class="btn-d btn-sm" onclick="removeActor('${esc(name)}')" style="padding:3px 8px;font-size:10px;">✕ 删除</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">`;
+    
+      charList.forEach(c => {
+        const isAssigned = (a.chars||[]).includes(c);
+        if (isAssigned) {
+          html += `<span style="background:#2563eb;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;" onclick="toggleCharForActor('${esc(name)}','${esc(c)}')">${esc(c)} ✕</span>`;
+        }
+      });
+    
+      html += `</div>
+        <div style="margin-top:6px;">
+          <select style="font-size:12px;padding:4px 8px;max-width:200px;" onchange="if(this.value)addCharToActor('${esc(name)}',this.value);this.value=''">
+            <option value="">＋ 添加角色…</option>`;
+    
+      const unassigned = charList.filter(c => !Object.values(actors).some(a => (a.chars||[]).includes(c)));
+      unassigned.forEach(c => {
+        const lineCount = countCharLines(s, c);
+        html += `<option value="${esc(c)}">${esc(c)} (${lineCount})</option>`;
+      });
+    
+      html += `</select></div></div>`;
+    });
+  
+    // Show unassigned characters
+    const assigned = new Set();
+    Object.values(actors).forEach(a => (a.chars||[]).forEach(c => assigned.add(c)));
+    const unassigned = charList.filter(c => !assigned.has(c));
+  
+    if (unassigned.length > 0) {
+      html += `<div style="background:#1a0e0e;border:1px solid #331111;border-radius:8px;padding:10px 14px;margin-top:4px;">
+        <div style="color:#888;font-size:12px;margin-bottom:6px;">📦 未分配角色 (${unassigned.length})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">`;
+      unassigned.forEach(c => {
+        const lineCount = countCharLines(s, c);
+        html += `<span style="background:#222;color:#ccc;padding:2px 8px;border-radius:4px;font-size:11px;">${esc(c)} (${lineCount})</span>`;
+      });
+      html += `</div></div>`;
+    }
+  
+    container.innerHTML = html;
+  }
+
+  function addActor() {
+    const s = gs(); if (!s) return;
+    const name = document.getElementById('newActorName').value.trim();
+    if (!name) { t('请输入演员名'); return; }
+    if (!s.actors) s.actors = {};
+    if (s.actors[name]) { t('该演员已存在'); return; }
+    s.actors[name] = { chars: [] };
+    save();
+    document.getElementById('newActorName').value = '';
+    renderActorManager();
+    t('已添加演员 ' + name);
+  }
+
+  function removeActor(name) {
+    const s = gs(); if (!s) return;
+    if (!confirm('删除演员 ' + name + '？角色分配不会丢失，会变为未分配状态')) return;
+    delete s.actors[name];
+    save();
+    renderActorManager();
+  }
+
+  function addCharToActor(actorName, charName) {
+    const s = gs(); if (!s) return;
+    if (!s.actors[actorName]) return;
+    if (!s.actors[actorName].chars.includes(charName)) {
+      s.actors[actorName].chars.push(charName);
+      save();
+      renderActorManager();
+    }
+  }
+
+  function toggleCharForActor(actorName, charName) {
+    const s = gs(); if (!s) return;
+    const chars = s.actors[actorName].chars;
+    const idx = chars.indexOf(charName);
+    if (idx >= 0) {
+      chars.splice(idx, 1);
+      save();
+      renderActorManager();
+    }
+  }
+
+function showLineImport() {
+  document.getElementById('liContent').value = '';
+  document.getElementById('liMo').classList.add('a');
+}
+function importLines() {
+  const content = document.getElementById('liContent').value;
+  if (!content.trim()) { t('请输入内容'); return; }
+  const items = parseToItems(content);
+  const result = itemsToShow('','',items);
+  const show = gs();
+  result.acts.forEach(act => {
+    const ex = show.acts.find(a => a.name === act.name);
+    if (ex) { ex.scenes.push(...act.scenes); }
+    else { show.acts.push(act); }
+  });
+  save(); closeMo('liMo'); renderShow(); t('已追加');
+}
+
+// ====================================================================
+//  TRANSLATE
+// ====================================================================
+async function showTranslateAll() {
+  const s = gs(); if (!s) return;
+  const overwrite = localStorage.getItem('st3_trOverwrite') === 'true';
+  const targets = [];
+  s.acts.forEach(act => act.scenes.forEach(sc => (sc.lines||[]).forEach((l,i) => {
+    if (l.type === 'dialogue' && l.en && (overwrite || !l.cn)) targets.push({ scene: sc, idx: i, text: l.en });
+  })));
+  if (!targets.length) { t('没有需要翻译的'); return; }
+  if (!confirm(`将翻译 ${targets.length} 条英文台词${overwrite ? '（覆盖已有中文）' : ''}？`)) return;
+
+  const bar = document.getElementById('tr-bar'); const done = document.getElementById('tr-done');
+  const total = document.getElementById('tr-total');
+  total.textContent = targets.length; done.textContent = '0';
+  document.getElementById('tr-progress').classList.add('a');
+
+  let succ = 0;
+  for (let i = 0; i < targets.length; i++) {
+    try {
+      const cn = await translate(targets[i].text);
+      if (cn) { targets[i].scene.lines[targets[i].idx].cn = cn; succ++; }
+    } catch(e) {}
+    done.textContent = i + 1;
+    bar.style.width = `${((i+1)/targets.length)*100}%`;
+    if (i % 10 === 0) save();
+  }
+  save();
+  document.getElementById('tr-progress').classList.remove('a');
+  renderShow();
+  t(`✅ ${succ}/${targets.length} 条翻译成功`);
+}
+
+// ====================================================================
+//  SETTINGS / LOCAL TRANSLATION
+// ====================================================================
+function showSettings() {
+  const eng = localStorage.getItem('st3_trEngine') || 'auto';
+  document.getElementById('trEngine').value = eng;
+  document.getElementById('ollamaSettings').style.display = eng === 'ollama' ? 'block' : 'none';
+  document.getElementById('ollamaTestSection').style.display = eng === 'ollama' ? 'block' : 'none';
+  document.getElementById('ollamaUrl').value = localStorage.getItem('st3_ollamaUrl') || 'http://localhost:11434';
+  document.getElementById('ollamaModel').value = localStorage.getItem('st3_ollamaModel') || 'qwen2.5:7b';
+  document.getElementById('trOverwrite').checked = localStorage.getItem('st3_trOverwrite') === 'true';
+  document.getElementById('ollamaTestResult').textContent = '';
+  document.getElementById('settingsMo').classList.add('a');
+}
+function saveSettings() {
+  localStorage.setItem('st3_trEngine', document.getElementById('trEngine').value);
+  localStorage.setItem('st3_ollamaUrl', document.getElementById('ollamaUrl').value);
+  localStorage.setItem('st3_ollamaModel', document.getElementById('ollamaModel').value);
+  localStorage.setItem('st3_trOverwrite', document.getElementById('trOverwrite').checked);
+  const eng = document.getElementById('trEngine').value;
+  document.getElementById('ollamaSettings').style.display = eng === 'ollama' ? 'block' : 'none';
+  document.getElementById('ollamaTestSection').style.display = eng === 'ollama' ? 'block' : 'none';
+}
+async function testOllama() {
+  const url = document.getElementById('ollamaUrl').value;
+  const el = document.getElementById('ollamaTestResult');
+  el.textContent = '测试中...'; el.style.color = '#888';
+  try {
+    const r = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    const models = (d.models || []).map(m => m.name);
+    el.textContent = `✅ 连接成功！可用模型: ${models.join(', ') || '无'}`;
+    el.style.color = '#6ee7b7';
+  } catch(e) {
+    el.textContent = '❌ 连接失败 — Ollama 是否在运行？';
+    el.style.color = '#f87171';
+  }
+}
+
+async function translate(text) {
+  // Check translation engine setting
+  const engine = localStorage.getItem('st3_trEngine') || 'auto';
+  if (engine === 'off') return '';
+
+  // Try local Ollama first
+  if (engine === 'ollama') {
+    const url = (localStorage.getItem('st3_ollamaUrl') || 'http://localhost:11434').replace(/\/+$/, '');
+    const model = localStorage.getItem('st3_ollamaModel') || 'qwen2.5:7b';
+    try {
+      const r = await fetch(url + '/api/generate', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          model, prompt: `Translate the following English text to Chinese (中文). Return ONLY the translation, no explanations, no quotes:\n\n${text}`,
+          stream: false, options: { temperature: 0.1 }
+        }),
+        signal: AbortSignal.timeout(15000)
+      });
+      const d = await r.json();
+      if (d.response) return d.response.trim();
+    } catch(e) { /* fall through to online */ }
+  }
+
+  // Online fallback (only if engine is auto or ollama failed)
+  if (engine !== 'ollama' || true) {
+    try {
+      const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh-CN`,{signal:AbortSignal.timeout(5000)});
+      const d = await r.json();
+      if (d.responseStatus === 200 && d.responseData) return d.responseData.translatedText || '';
+    } catch(e) {}
+    try {
+      const r = await fetch('https://libretranslate.com/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:text,source:'en',target:'zh'}),signal:AbortSignal.timeout(5000)});
+      const d = await r.json();
+      return d.translatedText || '';
+    } catch(e) { return ''; }
+  }
+  return '';
+}
+
+// ====================================================================
+//  PERFORMANCE
+// ====================================================================
+function flatLines() {
+  const s = gs(); if (!s) return [];
+  const r = [];
+  s.acts.forEach(a => a.scenes.forEach(sc => (sc.lines||[]).forEach(l => {
+    if (l.type === 'sd') return;
+    r.push({...l, _scene: sc.name, _type: sc.type, _act: a.name, _ref: l });
+  })));
+  return r;
+}
+let projWin = null;
+let perfScenes = []; // [{name, type, act, idx}]
+
+function startPerf() {
+  const all = flatLines();
+  if (!all.length) { t('没有内容'); return; }
+  perfIdx = -1; // -1 means title card
+  const s = gs();
+  document.getElementById('pf-show-title').textContent = s.titleCn ? `${s.title} · ${s.titleCn}` : s.title;
+  document.getElementById('pf').classList.add('a');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('pfTitleEn').textContent = s.title;
+  document.getElementById('pfTitleCn').textContent = s.titleCn || '';
+  showPf();
+  
+  // Build scene index from the original show structure
+  perfScenes = [];
+  let flatIdx = 0;
+  s.acts.forEach(a => {
+    a.scenes.forEach(sc => {
+      const sceneLines = (sc.lines||[]).filter(l => l.type !== 'sd');
+      if (sceneLines.length > 0) {
+        perfScenes.push({ name: sc.name, type: sc.type, act: a.name, idx: flatIdx });
+        flatIdx += sceneLines.length;
+      }
+    });
+  });
+
+  showPf();
+}
+
+function exitPerf() {
+  document.getElementById('pf').classList.remove('a');
+  document.body.style.overflow = '';
+}
+
+function showPf() {
+  const all = flatLines();
+  const total = all.length;
+  document.getElementById('pfProg').textContent = total > 0 ? `${perfIdx+1} / ${total}` : '0 / 0';
+
+  // Title card (perfIdx === -1)
+  if (perfIdx === -1) {
+    document.getElementById('pfTitleCard').style.display = 'flex';
+    document.getElementById('pfChar').textContent = '';
+    document.getElementById('pfEn').textContent = '';
+    document.getElementById('pfCn').textContent = '';
+    document.getElementById('pfSd').textContent = '';
+    document.getElementById('pfSceneTag').textContent = '';
+    document.getElementById('pfPrevBtn').style.display = 'none';
+    document.getElementById('pf-scene-label').textContent = '';
+    return;
+  }
+  document.getElementById('pfTitleCard').style.display = 'none';
+
+  if (!total) {
+    ['pfEn','pfCn','pfChar','pfSd','pfSceneTag'].forEach(id => document.getElementById(id).textContent = '');
+    document.getElementById('pfEmpty').style.display = 'block'; return;
+  }
+
+  document.getElementById('pfEmpty').style.display = 'none';
+  const l = all[perfIdx];
+
+  // Scene tag
+  let tag = `${l._act} · `;
+  if (l._type === 'song') tag += `🎵 ${l._scene}`;
+  else tag += `🎭 ${l._scene}`;
+  document.getElementById('pfSceneTag').textContent = tag;
+
+  document.getElementById('pfChar').textContent = l.char || '';
+  document.getElementById('pfSd').textContent = '';
+  document.getElementById('pfEn').textContent = l.en || '';
+  const cnEl = document.getElementById('pfCn');
+  if (l.cn) { cnEl.textContent = l.cn; cnEl.className = 'pf-cn'; }
+  else { cnEl.textContent = '⚠️ 缺翻译'; cnEl.className = 'pf-cn ms'; }
+  document.getElementById('pfPrevBtn').style.display = perfIdx > 0 ? '' : 'none';
+
+  // Update preview panel: next 2 cues
+  const previewEl = document.getElementById('pf-preview');
+  let previewHtml = '';
+  for (let i = 1; i <= 2; i++) {
+    const idx = perfIdx + i;
+    if (idx >= all.length) break;
+    const n = all[idx];
+    previewHtml += `<div class="pf-next-item">
+      <div class="n">+${i}</div>
+      ${n.char ? `<div class="nc">${esc(n.char)}</div>` : ''}
+      <div class="nt">${esc((n.en||'').slice(0,80))}</div>
+    </div>`;
+  }
+  previewEl.innerHTML = previewHtml || '<div style="color:#333;font-size:12px;padding:8px;">— 结束 —</div>';
+
+  // Update projector window if open
+  updateProjector();
+}
+
+function openProjector() {
+  if (projWin && !projWin.closed) { projWin.focus(); return; }
+  const w = 800, h = 600;
+  const l = (screen.width - w) / 2, t = (screen.height - h) / 2;
+  projWin = window.open('', 'projector', `width=${w},height=${h},left=${l},top=${t},menubar=no,toolbar=no,location=no,resizable=yes`);
+  if (!projWin) { t('⚠️ 浏览器阻止了弹窗，请允许此站点弹出窗口'); return; }
+  projWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>投屏</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:40px 60px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+    .pt{display:none;flex-direction:column;align-items:center}
+    .pt.a{display:flex}
+    .ptt{font-size:clamp(36px,6vw,72px);font-weight:700;color:#fff;margin-bottom:8px}
+    .pts{font-size:clamp(24px,4vw,48px);color:#6af;margin-bottom:24px}
+    .ptc{font-size:clamp(14px,2vw,20px);color:#555;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+    .pc{color:#fdba74;font-size:clamp(22px,3.5vw,34px);font-weight:500;margin-bottom:16px}
+    .pe{font-size:clamp(38px,6vw,72px);font-weight:300;text-align:center;line-height:1.6;margin-bottom:28px;max-width:90%}
+    .pz{font-size:clamp(32px,5vw,56px);font-weight:400;text-align:center;line-height:1.7;color:#6af;max-width:90%}
+    .pz.ms{color:#fbbf24;font-style:italic}
+    .ps{color:#333;font-size:14px;position:fixed;bottom:16px}
+    @media(max-width:768px){body{padding:20px 24px}}
+  </style></head><body>
+    <div class="pt" id="pjTitle">
+      <div class="ptt" id="pjTitleEn"></div>
+      <div class="pts" id="pjTitleCn"></div>
+      <div class="ptc">点击开始 ▶</div>
+    </div>
+    <div class="pc" id="pjChar" style="display:none"></div>
+    <div class="pe" id="pjEn" style="display:none"></div>
+    <div class="pz" id="pjCn" style="display:none"></div>
+    <div class="ps" id="pjScene"></div>
+    <script>function poll(){try{if(window.opener&&!window.opener.closed){const d=window.opener._projData;if(d){if(d.title){document.getElementById('pjTitle').className='pt a';document.getElementById('pjTitleEn').textContent=d.title;document.getElementById('pjTitleCn').textContent=d.titleCn||'';document.getElementById('pjChar').style.display='none';document.getElementById('pjEn').style.display='none';document.getElementById('pjCn').style.display='none'}else{document.getElementById('pjTitle').className='pt';document.getElementById('pjChar').style.display='';document.getElementById('pjEn').style.display='';document.getElementById('pjCn').style.display='';document.getElementById('pjChar').textContent=d.char||'';document.getElementById('pjEn').textContent=d.en||'';const c=document.getElementById('pjCn');if(d.cn){c.textContent=d.cn;c.className='pz'}else{c.textContent='缺翻译';c.className='pz ms'}}document.getElementById('pjScene').textContent=d.scene||''}}}catch(e){}requestAnimationFrame(poll)}poll()<\/script>
+  </body></html>`);
+  projWin.focus();
+  updateProjector();
+}
+
+function showSceneJump() {
+  const list = document.getElementById('pfJumpList');
+  list.innerHTML = perfScenes.map((sc, i) => {
+    const isCur = sc.idx <= perfIdx && (i === perfScenes.length-1 || perfScenes[i+1].idx > perfIdx);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #141414;cursor:pointer;${isCur?'background:#1e3a5f;':''}border-left:3px solid ${sc.type==='song'?'#6af':'#a78bfa'};" onclick="jumpToScene(${i})" onmouseover="this.style.background='#111'" onmouseout="this.style.background='${isCur?'#1e3a5f':'transparent'}'">
+      <span style="font-size:13px;color:#888;min-width:40px;">#${sc.idx+1}</span>
+      <span style="flex:1;font-size:14px;color:#fff;">${esc(sc.name)}</span>
+      <span style="font-size:11px;color:#666;">${sc.type==='song'?'🎵':'🎭'} ${sc.act}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('pfJumpMo').classList.add('a');
+}
+
+function jumpToScene(si) {
+  if (si >= 0 && si < perfScenes.length) {
+    perfIdx = perfScenes[si].idx;
+    closeMo('pfJumpMo');
+    showPf();
+  }
+}
+
+function editPerfCn() {
+  const all = flatLines();
+  if (!all.length || perfIdx >= all.length) return;
+  const l = all[perfIdx];
+  const cur = l._ref ? l._ref.cn || '' : l.cn || '';
+  const newCn = prompt('编辑中文翻译：', cur);
+  if (newCn === null) return;
+  if (l._ref) { l._ref.cn = newCn; }
+  else { l.cn = newCn; }
+  save();
+  showPf();
+  t('✅ 中文已更新');
+}
+
+function exitToEdit() {
+  const all = flatLines();
+  if (!all.length || perfIdx >= all.length) return;
+  const l = all[perfIdx];
+  // Find act and scene in show structure that contain this line
+  const s = gs(); if (!s) return;
+  let lineIdx = 0;
+  for (let ai = 0; ai < (s.acts||[]).length; ai++) {
+    const act = s.acts[ai];
+    for (let si = 0; si < (act.scenes||[]).length; si++) {
+      const sc = act.scenes[si];
+      const sceneLines = (sc.lines||[]).filter(l2 => l2.type !== 'sd');
+      if (lineIdx + sceneLines.length > perfIdx) {
+        // Found the scene - now find line index within it
+        const localIdx = perfIdx - lineIdx;
+        const realLineIdx = (sc.lines||[]).findIndex((l2, idx) => {
+          let count = -1;
+          for (let k = 0; k <= idx; k++) {
+            if ((sc.lines||[])[k].type !== 'sd') count++;
+          }
+          return count === localIdx;
+        });
+        // Exit perf and navigate to scene + highlight line
+        exitPerf();
+        curAct = ai; curScene = si;
+        page('p-scene');
+        document.getElementById('sceneLabel').textContent = `${act.name} → ${sc.name} (${sc.type==='song'?'🎵':'🎭'})`;
+        document.getElementById('lineSearch').value = '';
+        renderLines();
+        // Scroll to and highlight the line
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('#linesContainer .ie, #linesContainer .ic');
+          if (inputs[realLineIdx >= 0 ? realLineIdx * 2 : 0]) {
+            const el = inputs[realLineIdx >= 0 ? realLineIdx * 2 : 0];
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            el.focus();
+            el.style.outline = '2px solid #6af';
+            setTimeout(() => { el.style.outline = ''; }, 2000);
+          }
+        }, 100);
+        return;
+      }
+      lineIdx += sceneLines.length;
+    }
+  }
+}
+
+function updateProjector() {
+  if (!projWin || projWin.closed) return;
+  const all = flatLines();
+  const s = gs();
+  
+  if (perfIdx === -1) {
+    // Title card
+    _projData = {
+      title: s.title,
+      titleCn: s.titleCn || '',
+      scene: ''
+    };
+    return;
+  }
+  
+  if (!all.length || perfIdx >= all.length) return;
+  const l = all[perfIdx];
+  _projData = {
+    char: l.char || '',
+    en: l.en || '',
+    cn: l.cn || '',
+    scene: `${l._act} · ${l._scene}`
+  };
+}
+
+function pfNext() {
+  const a = flatLines();
+  if (perfIdx === -1) { perfIdx = 0; showPf(); return; } // Title card → first line
+  if (perfIdx < a.length-1) { perfIdx++; showPf(); }
+}
+function pfPrev(e) { if (e) e.stopPropagation(); if (perfIdx > 0) { perfIdx--; showPf(); } }
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('pf').classList.contains('a')) return;
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); pfNext(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); pfPrev(e); }
+  else if (e.key === 'Escape') { exitPerf(); }
+});
+
+// ====================================================================
+//  IO
+// ====================================================================
+function exportAll() {
+  const b = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+  a.download = `字幕_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(b); t('已导出全部');
+}
+
+function exportShow() {
+  const s = gs(); if (!s) return;
+  const showData = { shows: [s] };
+  const b = new Blob([JSON.stringify(showData,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+  const name = s.title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_');
+  a.download = `${name}.json`;
+  a.click(); URL.revokeObjectURL(b); t(`已导出「${s.title}」`);
+}
+function importData(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (!d.shows) throw new Error('no');
+      d.shows.forEach(s => data.shows.push(s));
+      save(); renderHome(); t('导入成功');
+    } catch(err) { t('导入失败'); }
+  };
+  r.readAsText(f); e.target.value = '';
+}
+
+// ====================================================================
+//  DRAG
+// ====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  const z = document.getElementById('dropZone');
+  if (!z) return;
+  z.addEventListener('click', () => document.getElementById('docxInput').click());
+  z.addEventListener('dragover', e => { e.preventDefault(); z.style.borderColor = '#6af'; });
+  z.addEventListener('dragleave', () => { z.style.borderColor = '#2a2a2a'; });
+  z.addEventListener('drop', e => {
+    e.preventDefault(); z.style.borderColor = '#2a2a2a';
+    const files = e.dataTransfer.files;
+    if (files.length && (files[0].name.endsWith('.docx') || files[0].name.endsWith('.pdf'))) {
+      const inp = document.getElementById('docxInput');
+      const dt = new DataTransfer(); dt.items.add(files[0]);
+      inp.files = dt.files; inp.dispatchEvent(new Event('change'));
+    } else { t('请拖入 .docx 或 .pdf 文件'); }
+  });
+});
+
+load(); renderHome();
+</script>
+</body>
+</html>
