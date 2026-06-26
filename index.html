@@ -625,6 +625,50 @@
   </div>
 </div>
 
+<!-- FIXTURE EDITOR MODAL -->
+<div class="mo" id="fixtureEditorMo">
+  <div class="md" style="max-width:500px;">
+    <h3 id="feTitle">添加灯具</h3>
+    <div class="fr">
+      <div class="fg"><label>Channel编号 *</label><input id="feCh" placeholder="1"></div>
+      <div class="fg"><label>位置</label>
+        <select id="fePosition" style="font-size:12px;padding:6px 10px;">
+          <option value="top">顶光</option>
+          <option value="back">逆光</option>
+          <option value="front">面光</option>
+          <option value="side">侧光</option>
+          <option value="spot">追光</option>
+          <option value="floor">地排</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label>颜色</label>
+        <select id="feColor" style="font-size:12px;padding:6px 10px;" onchange="document.getElementById('feColorPreview').style.background=colorSelectToHex(this.value)">
+          <option value="暖白" style="background:#fff8e0;">暖白 2700K</option>
+          <option value="冷白" style="background:#f0f4ff;">冷白 5600K</option>
+          <option value="蓝" style="background:#e0f0ff;">蓝色</option>
+          <option value="红" style="background:#ffe0e0;">红色</option>
+          <option value="粉" style="background:#ffe0e8;">粉红</option>
+          <option value="黄" style="background:#fff8d0;">黄色</option>
+          <option value="绿" style="background:#e0ffe0;">绿色</option>
+          <option value="紫" style="background:#f0e0ff;">紫色</option>
+          <option value="琥珀" style="background:#ffe8c0;">琥珀</option>
+          <option value="白" style="background:#fff;">白色</option>
+        </select>
+      </div>
+      <div class="fg"><label>预览</label>
+        <div id="feColorPreview" style="width:100%;height:32px;border-radius:6px;background:#fff8e0;border:1px solid #333;"></div>
+      </div>
+    </div>
+    <div class="fg"><label>用途</label><input id="fePurpose" placeholder="如：面光、逆光洗墙、追BONNIE"></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('fixtureEditorMo')">取消</button>
+      <button class="btn-p" onclick="saveFixture()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- PROP MANAGER MODAL -->
 <div class="mo" id="propMo">
   <div class="md" style="max-width:850px;">
@@ -2751,6 +2795,7 @@ function renderMicFlow() {
 //  MODULE: LIGHTING CUES
 // ====================================================================
 let editingCueIdx = -1;
+let editingFixtureIdx = -1;
 
 function showLightingCues() {
   const s = gs(); if (!s) return;
@@ -2872,27 +2917,56 @@ function renderFixtures() {
 }
 
 function addFixture() {
-  const ch = prompt('Channel编号：'); if (!ch) return;
-  const position = prompt('位置 (back=逆光 top=顶光 front=面光 side=侧光 spot=追光 floor=地排)：', 'top');
-  const colorName = prompt('颜色名称 (如 暖白2700K, 蓝色, 粉红)：', '暖白') || '白';
-  const purpose = prompt('用途 (如 面光, 逆光洗墙, 追BONNIE)：') || '';
-  const colorMap = { '暖白':'#fff8e0','白':'#fff','蓝':'#e0f0ff','红':'#ffe0e0','粉':'#ffe0e8','黄':'#fff8d0','绿':'#e0ffe0','紫':'#f0e0ff','琥珀':'#ffe8c0','冷白':'#f0f4ff' };
-  const colorHex = colorMap[colorName] || '#eee';
-  if (!gs().fixtures) gs().fixtures = [];
-  gs().fixtures.push({ ch, position, colorName, colorHex, purpose });
-  save(); renderFixtures(); t('已添加 CH'+ch);
+  editingFixtureIdx = -1;
+  document.getElementById('feTitle').textContent = '添加灯具';
+  document.getElementById('feCh').value = '';
+  document.getElementById('fePosition').value = 'top';
+  document.getElementById('feColor').value = '暖白';
+  document.getElementById('feColorPreview').style.background = '#fff8e0';
+  document.getElementById('fePurpose').value = '';
+  closeMo('lightMo');
+  document.getElementById('fixtureEditorMo').classList.add('a');
 }
 
 function editFixture(idx) {
   const f = gs().fixtures[idx]; if (!f) return;
-  const ch = prompt('Channel编号：', f.ch); if (!ch) return;
-  const position = prompt('位置：', f.position);
-  const colorName = prompt('颜色名称：', f.colorName) || '白';
-  const purpose = prompt('用途：', f.purpose) || '';
-  const colorMap = { '暖白':'#fff8e0','白':'#fff','蓝':'#e0f0ff','红':'#ffe0e0','粉':'#ffe0e8','黄':'#fff8d0','绿':'#e0ffe0','紫':'#f0e0ff','琥珀':'#ffe8c0','冷白':'#f0f4ff' };
-  f.ch = ch; f.position = position; f.colorName = colorName; f.colorHex = colorMap[colorName] || '#eee'; f.purpose = purpose;
-  save(); renderFixtures(); t('已更新');
+  editingFixtureIdx = idx;
+  document.getElementById('feTitle').textContent = '编辑灯具';
+  document.getElementById('feCh').value = f.ch;
+  document.getElementById('fePosition').value = f.position;
+  document.getElementById('feColor').value = f.colorName;
+  document.getElementById('feColorPreview').style.background = f.colorHex || '#eee';
+  document.getElementById('fePurpose').value = f.purpose || '';
+  closeMo('lightMo');
+  document.getElementById('fixtureEditorMo').classList.add('a');
 }
+
+function colorSelectToHex(v) {
+  const m = { '暖白':'#fff8e0','冷白':'#f0f4ff','蓝':'#e0f0ff','红':'#ffe0e0','粉':'#ffe0e8','黄':'#fff8d0','绿':'#e0ffe0','紫':'#f0e0ff','琥珀':'#ffe8c0','白':'#fff' };
+  return m[v] || '#eee';
+}
+
+function saveFixture() {
+  const s = gs(); if (!s) return;
+  const ch = document.getElementById('feCh').value.trim();
+  if (!ch) { t('请输入Channel编号'); return; }
+  const position = document.getElementById('fePosition').value;
+  const colorName = document.getElementById('feColor').value;
+  const colorHex = colorSelectToHex(colorName);
+  const purpose = document.getElementById('fePurpose').value.trim();
+  if (!s.fixtures) s.fixtures = [];
+  if (editingFixtureIdx >= 0 && s.fixtures[editingFixtureIdx]) {
+    s.fixtures[editingFixtureIdx] = { ch, position, colorName, colorHex, purpose };
+  } else {
+    s.fixtures.push({ ch, position, colorName, colorHex, purpose });
+  }
+  save();
+  closeMo('fixtureEditorMo');
+  document.getElementById('lightMo').classList.add('a');
+  renderFixtures();
+  t('已保存 CH'+ch);
+}
+
 function delFixture(idx) { if (!confirm('删除此灯具？')) return; gs().fixtures.splice(idx,1); save(); renderFixtures(); }
 
 // --- Magic Sheet (SVG) ---
