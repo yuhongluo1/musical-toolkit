@@ -433,7 +433,12 @@
     <button class="btn-g" onclick="showActorManager()">👥 演员</button>
     <button class="btn-g" onclick="showLineImport()">📄 追加</button>
     <button class="btn-g btn-sm" onclick="exportShow()">📤 导出</button>
-    <button class="btn-w btn-sm" onclick="exportCueScript()">📋 总cue表</button>
+    <div style="display:flex;gap:3px;flex-wrap:wrap;">
+      <button class="btn-w btn-sm" onclick="exportCueScript('all')" title="所有cue">📋 总</button>
+      <button class="btn-g btn-sm" onclick="exportCueScript('mic')" title="仅Mic">🎤</button>
+      <button class="btn-g btn-sm" onclick="exportCueScript('light')" title="仅灯光">💡</button>
+      <button class="btn-g btn-sm" onclick="exportCueScript('prop')" title="仅道具">📦</button>
+    </div>
     <button class="btn-g" onclick="showMicManager()">🎤 麦克风</button>
     <button class="btn-g" onclick="showLightingCues()">💡 灯光</button>
     <button class="btn-g" onclick="showPropManager()">📦 道具</button>
@@ -3026,53 +3031,81 @@ function exportProps() {
   w.document.close();
 }
 
-function exportCueScript() {
+function exportCueScript(type) {
   const s = gs(); if (!s) return;
-  // Build scene-key lookup for mics, lights, props
+  // Build scene-key lookups
   const micByScene = {}; (s.mics?.assignments||[]).forEach(a => { if(!micByScene[a.sceneKey]) micByScene[a.sceneKey]=[]; micByScene[a.sceneKey].push(a); });
   const lightByScene = {}; (s.lightingCues||[]).forEach(c => { if(!lightByScene[c.sceneKey]) lightByScene[c.sceneKey]=[]; lightByScene[c.sceneKey].push(c); });
   const propByScene = {}; (s.props||[]).forEach(p => (p.sceneCues||[]).forEach(c => { if(!propByScene[c.sceneKey]) propByScene[c.sceneKey]=[]; propByScene[c.sceneKey].push({prop:p,cue:c}); }));
-  
+
+  const showMic = type === 'all' || type === 'mic';
+  const showLight = type === 'all' || type === 'light';
+  const showProp = type === 'all' || type === 'prop';
+
+  const typeLabels = { all:'总cue', mic:'Mic', light:'灯光', prop:'道具' };
+  const typeIcons = { all:'📋', mic:'🎤', light:'💡', prop:'📦' };
+
+  let totalScenes = 0, totalLines = 0;
   let body = '';
   s.acts.forEach((act, ai) => {
-    body += `<h2 style="font-size:16px;color:#333;border-bottom:2px solid #333;padding-bottom:4px;margin:20px 0 10px;">${esc(act.name)}</h2>`;
+    body += `<div class="act">${esc(act.name)}</div>`;
     act.scenes.forEach((sc, si) => {
+      totalScenes++;
       const sk = `${ai}-${si}`;
-      // Scene header
-      body += `<h3 style="font-size:14px;color:#555;margin:14px 0 6px;">${sc.type==='song'?'🎵':''} ${esc(sc.name)}</h3>`;
-      // Cue header block
-      const mics = micByScene[sk]||[], lights = lightByScene[sk]||[], props = propByScene[sk]||[];
-      if (mics.length || lights.length || props.length) {
-        body += `<div style="background:#f0f4ff;border:1px solid #d0d8f0;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#555;">`;
-        if (mics.length) body += `<div><strong>🎤 Mic:</strong> ${mics.map(a => `${a.micId}→${a.actor}${a.character?'('+a.character+')':''}`).join(' / ')}</div>`;
-        if (lights.length) body += `<div><strong>💡 灯:</strong> ${lights.map(c => `${c.number} ${c.desc} (${c.timingLabel})${c.operator?' — '+c.operator:''}`).join(' / ')}</div>`;
-        if (props.length) body += `<div><strong>📦 道具:</strong> ${props.map(({prop,cue}) => `${prop.name}${cue.onTime?' ↑'+cue.onTime:''}${cue.offTime?' ↓'+cue.offTime:''}`).join(' / ')}</div>`;
-        body += `</div>`;
+      body += `<div class="scn">${sc.type==='song'?'🎵 ':''}${esc(sc.name)}</div>`;
+      // Build cue annotations for this scene
+      const notes = [];
+      if (showMic) {
+        const m = micByScene[sk]||[];
+        if (m.length) notes.push(`🎤 ${m.map(a => `${a.micId}→${a.actor}${a.character?'('+a.character+')':''}`).join(' / ')}`);
       }
+      if (showLight) {
+        const l = lightByScene[sk]||[];
+        if (l.length) notes.push(`💡 ${l.map(c => `${c.number} ${c.desc} (${c.timingLabel})${c.operator?' - '+c.operator:''}`).join(' / ')}`);
+      }
+      if (showProp) {
+        const p = propByScene[sk]||[];
+        if (p.length) notes.push(`📦 ${p.map(({prop:p2,cue}) => `${p2.name}${cue.onTime?' ↑'+cue.onTime:''}${cue.offTime?' ↓'+cue.offTime:''}`).join(' / ')}`);
+      }
+      if (notes.length) body += `<div class="cue">${notes.join('<br>')}</div>`;
       // Lines
       (sc.lines||[]).forEach(l => {
+        totalLines++;
         if (l.type === 'sd') {
-          body += `<div style="font-style:italic;color:#888;padding:4px 10px;font-size:12px;">📋 ${esc(l.text||l.en||'')}</div>`;
+          body += `<div class="sd">${esc(l.text||l.en||'')}</div>`;
         } else {
-          body += `<div style="padding:4px 10px;border-left:3px solid #e0e0e0;margin:2px 0;">`;
-          if (l.char) body += `<div style="font-weight:600;font-size:12px;color:#d97706;">${esc(l.char)}</div>`;
-          body += `<div style="font-size:14px;">${esc(l.en||'')}</div>`;
-          body += `<div style="font-size:13px;color:#2563eb;">${l.cn ? esc(l.cn) : '<span style="color:#dc2626;">⚠️ 缺翻译</span>'}</div>`;
-          body += `</div>`;
+          body += `<div class="line">${l.char?`<span class="ch">${esc(l.char)}</span>`:''}<span class="en">${esc(l.en||'')}</span>${l.cn?`<span class="cn">${esc(l.cn)}</span>`:'<span class="cn miss">⚠️ 缺翻译</span>'}</div>`;
         }
       });
     });
   });
-  
-  const html = `<html><head><meta charset="utf-8"><title>Cue剧本 - ${s.title}</title><style>
-    body{font-family:sans-serif;padding:24px;color:#222;max-width:800px;margin:0 auto}
-    h1{font-size:20px;margin-bottom:2px} .sub{color:#888;font-size:12px;margin-bottom:20px}
-    @media print{body{padding:12px}button{display:none}}
+
+  const html = `<html><head><meta charset="utf-8"><title>${typeIcons[type]} ${esc(s.title)} - ${typeLabels[type]}</title><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;padding:32px 40px;color:#1a1a1a;max-width:820px;margin:0 auto;line-height:1.5}
+    .hdr{margin-bottom:24px;border-bottom:2px solid #1a1a1a;padding-bottom:12px}
+    .hdr h1{font-size:22px;font-weight:700}
+    .hdr .meta{color:#888;font-size:12px;margin-top:4px}
+    .hdr .meta span{margin-right:16px}
+    .act{font-size:15px;font-weight:700;color:#1a1a1a;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #ccc;text-transform:uppercase;letter-spacing:1px}
+    .scn{font-size:13px;font-weight:600;color:#444;margin:12px 0 4px}
+    .cue{background:#f5f6f8;border-left:3px solid #888;padding:6px 12px;margin:6px 0 8px;font-size:10.5px;color:#555;line-height:1.7;font-family:'SF Mono','Menlo',monospace}
+    .sd{font-style:italic;color:#888;padding:3px 0 3px 14px;font-size:12px;border-left:1px solid #ddd;margin:2px 0}
+    .line{padding:2px 0 2px 14px;border-left:1px solid #eee;margin:1px 0}
+    .ch{font-size:11px;font-weight:600;color:#d97706;display:block}
+    .en{font-size:14px;color:#1a1a1a;display:block}
+    .cn{font-size:13px;color:#2563eb;display:block}
+    .cn.miss{color:#dc2626;font-style:italic}
+    .btn{display:inline-block;margin-top:24px;padding:8px 20px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;color:#333}
+    .btn:hover{background:#f5f5f5}
+    @media print{body{padding:20px 24px}.btn{display:none}}
   </style></head><body>
-    <h1>📋 ${esc(s.title)} ${s.titleCn?'· '+esc(s.titleCn):''}</h1>
-    <p class="sub">Cue剧本 — ${new Date().toLocaleDateString()} · ${s.acts.reduce((a,act)=>a+act.scenes.length,0)}场 · ${s.acts.reduce((a,act)=>a+act.scenes.reduce((b,sc)=>b+(sc.lines||[]).length,0),0)}行</p>
+    <div class="hdr">
+      <h1>${typeIcons[type]} ${esc(s.title)}${s.titleCn?' · '+esc(s.titleCn):''}</h1>
+      <div class="meta"><span>${typeLabels[type]}剧本</span><span>${totalScenes}场 · ${totalLines}行</span><span>${new Date().toLocaleDateString()}</span></div>
+    </div>
     ${body}
-    <button onclick="window.print()" style="margin-top:20px;padding:8px 20px;font-size:14px;cursor:pointer;">🖨 打印 / 存PDF</button>
+    <button class="btn" onclick="window.print()">🖨 打印 / 导出PDF</button>
   </body></html>`;
   const w = window.open('', '_blank', 'width=800,height=600');
   w.document.write(html);
