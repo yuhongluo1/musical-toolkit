@@ -276,7 +276,7 @@
 <body>
 
 <div id="hdr">
-  <h1>🎭 字幕工具</h1>
+  <h1>🎭 工具包</h1>
   <div class="ha">
     <button class="btn-g btn-sm" onclick="showSettings()">⚙️</button>
     <button class="btn-g btn-sm" onclick="exportAll()">📤 导出</button>
@@ -295,11 +295,12 @@
 <!-- HOME -->
 <div id="p-home" class="page a">
   <div class="hero">
-    <h2>音乐剧字幕工具</h2>
-    <p>上传 Word 文档 → 预览解析结果 → 一键演出</p>
+    <h2>音乐剧制作工具包</h2>
+    <p style="font-size:14px;color:#888;margin-bottom:6px;">剧本 · 翻译 · 字幕演出 · Mic表 · 灯光Cue · 道具表</p>
+    <p style="font-size:12px;color:#555;margin-bottom:24px;">一个页面搞定排练到演出的所有事，完全免费</p>
     <div class="drop-zone" id="dropZone">
       <div class="big">📄</div>
-      <p><strong>上传文档</strong> (.docx / .pdf)</p>
+      <p><strong>上传剧本</strong> (.docx / .pdf)</p>
       <div class="sm">或拖拽到这里</div>
     </div>
     <input type="file" id="docxInput" accept=".docx,.pdf" style="display:none" onchange="handleFile(event)">
@@ -1219,12 +1220,23 @@ function renderHome() {
     return;
   }
   g.innerHTML = data.shows.map((s,i) => {
-    const total = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type!=='sd').length||0),0),0);
+    const totalLines = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type!=='sd').length||0),0),0);
     const missing = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='dialogue'&&!l.cn).length||0),0),0);
+    const scenes = s.acts.reduce((a,act) => a + act.scenes.length,0);
+    const micCount = (s.mics?.inventory||[]).length;
+    const cueCount = (s.lightingCues||[]).length;
+    const propCount = (s.props||[]).length;
+    const hasModules = micCount > 0 || cueCount > 0 || propCount > 0;
     return `<div class="sc" onclick="openShow(${i})">
       <h3>${esc(s.title)}</h3>
-      <div class="m">${s.acts.length} 幕 · ${total} 条对白</div>
-      ${missing ? `<div class="badge badge-warn">⚠️ ${missing} 缺翻译</div>` : `<div class="badge badge-ok">✓ 完整</div>`}
+      <div class="m" style="font-size:11px;line-height:1.6;">
+        ${s.acts.length}幕 · ${scenes}段 · ${totalLines}条对白
+        ${missing ? ` · <span style="color:#fbbf24;">⚠️缺${missing}翻译</span>` : ''}
+        ${hasModules ? '<br>' : ''}
+        ${micCount ? `🎤${micCount} ` : ''}${cueCount ? `💡${cueCount} ` : ''}${propCount ? `📦${propCount} ` : ''}
+      </div>
+      ${!missing && totalLines > 0 ? `<div class="badge badge-ok">✓ 剧本完整</div>` : ''}
+      ${!hasModules && totalLines > 0 ? `<div class="badge badge-warn">➕ 可添加Mic/灯/道具</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1278,12 +1290,18 @@ function renderShow() {
   const total = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type!=='sd').length||0),0),0);
   const missing = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='dialogue'&&!l.cn).length||0),0),0);
   const sd = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='sd').length||0),0),0);
+  const micCount = (s.mics?.inventory||[]).length;
+  const cueCount = (s.lightingCues||[]).length;
+  const propCount = (s.props||[]).length;
   document.getElementById('showTB').innerHTML = `
     <span class="st">🎭 <span>${s.acts.length}</span> 幕</span>
     <span class="st">📝 <span>${s.acts.reduce((a,act) => a + act.scenes.length,0)}</span> 段</span>
     <span class="st">💬 <span>${total}</span> 条对白</span>
     <span class="st">📋 <span>${sd}</span> 条指示</span>
     ${missing ? `<span class="st" style="color:#fbbf24;">⚠️ <span>${missing}</span> 缺翻译</span>` : ''}
+    ${micCount ? `<span class="st">🎤 <span>${micCount}</span> 支Mic</span>` : ''}
+    ${cueCount ? `<span class="st">💡 <span>${cueCount}</span> 个Cue</span>` : ''}
+    ${propCount ? `<span class="st">📦 <span>${propCount}</span> 件道具</span>` : ''}
   `;
 
   document.getElementById('translateBtn').style.display = missing ? '' : 'none';
