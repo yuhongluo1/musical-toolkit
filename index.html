@@ -271,6 +271,33 @@
   .tm-flow .from{color:#fdba74}
   .tm-flow .to{color:#6af}
   .tm-flow .warn{color:#fbbf24;font-size:10px}
+
+  /* REHEARSAL MODE */
+  #rh{position:fixed;inset:0;z-index:150;background:#0d0d0d;display:none;flex-direction:column}
+  #rh.a{display:flex}
+  #rh-hdr{padding:10px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a1a1a}
+  #rh-hdr .title{color:#fff;font-size:15px;font-weight:600}
+  #rh-hdr .info{color:#555;font-size:12px}
+  #rh-body{flex:1;display:flex;overflow:hidden}
+  #rh-script{flex:1;overflow-y:auto;padding:20px 32px}
+  #rh-panel{width:340px;overflow-y:auto;padding:14px 16px;border-left:1px solid #1a1a1a;display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+  .rh-line{padding:8px 14px;border-left:3px solid #1a1a1a;margin-bottom:3px;cursor:pointer;transition:all .1s;border-radius:0 6px 6px 0}
+  .rh-line:hover{background:#111}
+  .rh-line.cur{border-left-color:#6af;background:rgba(37,99,235,.08)}
+  .rh-line .ch{color:#fdba74;font-size:13px;font-weight:500}
+  .rh-line .en{color:#ddd;font-size:15px}
+  .rh-line .cn{color:#6af;font-size:15px}
+  .rh-line .cn.ms{color:#fbbf24;font-style:italic}
+  .rh-line .sd{color:#555;font-size:13px;font-style:italic}
+  .rh-card{background:#111;border:1px solid #1a1a1a;border-radius:10px;padding:10px 14px}
+  .rh-card h4{font-size:12px;color:#888;margin-bottom:6px;font-weight:500}
+  .rh-card .item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px}
+  .rh-card .item .lbl{color:#aaa}
+  .rh-card .item .val{color:#6af}
+  .rh-ftr{padding:8px 24px;display:flex;align-items:center;gap:10px;border-top:1px solid #1a1a1a}
+  .rh-ftr button{background:#222;border:none;color:#aaa;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:12px}
+  .rh-ftr button:hover{background:#333;color:#fff}
+  .rh-ftr .prog{color:#555;font-size:12px;flex:1;text-align:center}
 </style>
 </head>
 <body>
@@ -400,6 +427,7 @@
   <div class="tb" id="showTB"></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
     <button class="btn-s" onclick="startPerf()">▶ 演出模式</button>
+    <button class="btn-w" onclick="startRehearsal()">🎬 排演模式</button>
     <button class="btn-w" onclick="showTranslateAll()" id="translateBtn">🌐 翻译缺漏</button>
     <button class="btn-g" onclick="showCharDialog()">🎭 角色台词</button>
     <button class="btn-g" onclick="showActorManager()">👥 演员</button>
@@ -411,6 +439,37 @@
     <button class="btn-d btn-sm" onclick="delShow()">🗑 删除</button>
   </div>
   <div id="actsContainer"></div>
+</div>
+
+<!-- REHEARSAL MODE -->
+<div id="rh">
+  <div id="rh-hdr">
+    <span class="title">🎬 <span id="rhTitle"></span></span>
+    <span class="info" id="rhSceneInfo"></span>
+    <button style="background:none;border:none;color:#555;cursor:pointer;font-size:18px;" onclick="exitRehearsal()">✕</button>
+  </div>
+  <div id="rh-body">
+    <div id="rh-script"></div>
+    <div id="rh-panel">
+      <div class="rh-card">
+        <h4>🎤 当前场景Mic</h4>
+        <div id="rhMicPanel">暂无分配</div>
+      </div>
+      <div class="rh-card">
+        <h4>💡 灯光Cue</h4>
+        <div id="rhLightPanel">暂无Cue</div>
+      </div>
+      <div class="rh-card">
+        <h4>📦 道具上下场</h4>
+        <div id="rhPropPanel">暂无道具</div>
+      </div>
+    </div>
+  </div>
+  <div class="rh-ftr">
+    <button onclick="rhPrev()">← 上一条</button>
+    <span class="prog" id="rhProg">0 / 0</span>
+    <button onclick="rhNext()">下一条 →</button>
+  </div>
 </div>
 
 <!-- SCENE EDITOR -->
@@ -2764,6 +2823,100 @@ function delLightCue(idx) {
   if (!confirm('删除此Cue？')) return;
   gs().lightingCues.splice(idx, 1);
   save(); renderLightCues();
+}
+
+// ====================================================================
+//  REHEARSAL MODE (script + mic + lights + props in one view)
+// ====================================================================
+let rhIdx = 0;
+
+function startRehearsal() {
+  const s = gs(); if (!s) return;
+  const all = flatLines();
+  if (!all.length) { t('没有内容'); return; }
+  rhIdx = 0;
+  document.getElementById('rhTitle').textContent = s.titleCn ? `${s.title} · ${s.titleCn}` : s.title;
+  document.getElementById('rh').classList.add('a');
+  document.body.style.overflow = 'hidden';
+  renderRehearsal();
+  document.getElementById('rh-script').scrollTop = 0;
+}
+
+function exitRehearsal() {
+  document.getElementById('rh').classList.remove('a');
+  document.body.style.overflow = '';
+}
+
+function renderRehearsal() {
+  const s = gs(); if (!s) return;
+  const all = flatLines();
+  if (!all.length) return;
+  const line = all[rhIdx];
+  document.getElementById('rhProg').textContent = `${rhIdx + 1} / ${all.length}`;
+  const start = Math.max(0, rhIdx - 8);
+  const end = Math.min(all.length, rhIdx + 10);
+  let scriptHtml = '';
+  for (let i = start; i < end; i++) {
+    const l = all[i]; const isCur = i === rhIdx;
+    if (l.type === 'sd') {
+      scriptHtml += `<div class="rh-line ${isCur?'cur':''}" onclick="rhJump(${i})"><div class="sd">📋 ${esc(l.text||l.en||'')}</div></div>`;
+    } else {
+      scriptHtml += `<div class="rh-line ${isCur?'cur':''}" onclick="rhJump(${i})">
+        ${l.char ? `<div class="ch">${esc(l.char)}</div>` : ''}
+        <div class="en">${esc(l.en||'')}</div>
+        <div class="cn ${l.cn?'':'ms'}">${l.cn ? esc(l.cn) : '⚠️'}</div>
+      </div>`;
+    }
+  }
+  document.getElementById('rh-script').innerHTML = scriptHtml;
+  const curEl = document.querySelector('#rh-script .rh-line.cur');
+  if (curEl) curEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  document.getElementById('rhSceneInfo').textContent = `${line._act} · ${line._scene} (${line._type==='song'?'🎵':'🎭'})`;
+  updateRhMic(line); updateRhLights(line); updateRhProps(line);
+}
+
+function rhNext() { const all = flatLines(); if (rhIdx < all.length-1) { rhIdx++; renderRehearsal(); } }
+function rhPrev() { if (rhIdx > 0) { rhIdx--; renderRehearsal(); } }
+function rhJump(i) { rhIdx = i; renderRehearsal(); }
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('rh').classList.contains('a')) return;
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); rhNext(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); rhPrev(); }
+  else if (e.key === 'Escape') { exitRehearsal(); }
+});
+
+function updateRhMic(line) {
+  const s = gs(); let sk = '';
+  s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => { if (act.name===line._act && sc.name===line._scene) sk=`${ai}-${si}`; }));
+  if (!sk) { document.getElementById('rhMicPanel').innerHTML = '<div style="color:#444;font-size:11px;">—</div>'; return; }
+  const a = (s.mics?.assignments||[]).filter(x => x.sceneKey===sk);
+  if (!a.length) { document.getElementById('rhMicPanel').innerHTML = '<div style="color:#444;font-size:11px;">未分配</div>'; return; }
+  document.getElementById('rhMicPanel').innerHTML = a.map(x => `<div class="item"><span class="val">${esc(x.micId)}</span><span style="color:#888;">→</span><span style="color:#fdba74;">${esc(x.actor)}</span>${x.character?` <span style="color:#555;">(${esc(x.character)})</span>`:''}</div>`).join('');
+}
+
+function updateRhLights(line) {
+  const s = gs(); let sk = '';
+  s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => { if (act.name===line._act && sc.name===line._scene) sk=`${ai}-${si}`; }));
+  const cues = (s.lightingCues||[]).filter(c => c.sceneKey===sk);
+  if (!cues.length) { document.getElementById('rhLightPanel').innerHTML = '<div style="color:#444;font-size:11px;">暂无Cue</div>'; return; }
+  document.getElementById('rhLightPanel').innerHTML = cues.map(c => `<div class="item"><span class="lbl">${esc(c.number||'')}</span><span style="color:#a78bfa;">${esc(c.desc||'')}</span><span style="color:#555;font-size:10px;">${esc(c.timingLabel||'')}${c.operator?' · '+esc(c.operator):''}</span></div>`).join('');
+}
+
+function updateRhProps(line) {
+  const s = gs(); let sk = '';
+  s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => { if (act.name===line._act && sc.name===line._scene) sk=`${ai}-${si}`; }));
+  const sp = (s.props||[]).filter(p => (p.sceneCues||[]).some(c => c.sceneKey===sk));
+  if (!sp.length) { document.getElementById('rhPropPanel').innerHTML = '<div style="color:#444;font-size:11px;">暂无道具</div>'; return; }
+  let h = '';
+  sp.forEach(p => {
+    const c = (p.sceneCues||[]).find(c2 => c2.sceneKey===sk);
+    if (c) {
+      if (c.onTime) h += `<div class="item"><span class="tag tag-status-ready" style="font-size:9px;padding:1px 6px;">↑</span><span class="lbl">${esc(p.name)}</span><span class="val">${esc(c.onTime)}</span></div>`;
+      if (c.offTime) h += `<div class="item"><span class="tag tag-status-repair" style="font-size:9px;padding:1px 6px;">↓</span><span class="lbl">${esc(p.name)}</span><span class="val">${esc(c.offTime)}</span></div>`;
+    }
+  });
+  document.getElementById('rhPropPanel').innerHTML = h;
 }
 
 // ====================================================================
