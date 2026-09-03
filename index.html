@@ -259,6 +259,11 @@
   .tag-status-repair{background:#451a03;color:#fbbf24}
   .tag-status-need{background:#1a1a3a;color:#93c5fd}
   .tm-empty{text-align:center;padding:40px;color:#555;font-size:13px}
+  .empty-card{text-align:center;padding:36px 20px;background:#121212;border:1px dashed #2a2a2a;border-radius:12px;margin-top:6px}
+  .empty-card .ic{font-size:34px;margin-bottom:10px}
+  .empty-card .t{font-size:14px;color:#ddd;margin-bottom:4px}
+  .empty-card .d{font-size:12px;color:#777;margin-bottom:14px}
+  .empty-card button{font-size:13px;padding:8px 22px}
   .tm-btn-sm{padding:3px 8px;font-size:10px;border-radius:4px;background:#222;color:#888;border:none;cursor:pointer}
   .tm-btn-sm:hover{background:#333;color:#fff}
   .tm-hint{color:#555;font-size:11px;margin-bottom:8px}
@@ -449,6 +454,7 @@
     <button class="btn-g btn-sm" onclick="renameShow()" style="padding:2px 8px;font-size:11px;">✏️</button>
   </div>
   <div class="tb" id="showTB"></div>
+  <div id="guideCard"></div>
   <div style="margin-bottom:12px;">
     <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:#111;border-radius:8px;margin-bottom:3px;">
       <span style="color:#555;font-size:10px;min-width:42px;">🎬 演出</span>
@@ -1104,6 +1110,9 @@ function load(){
 function save(){localStorage.setItem('st3',JSON.stringify(data))}
 function t(m){const o=document.getElementById('toast');o.textContent=m;o.classList.add('show');clearTimeout(o._t);o._t=setTimeout(()=>o.classList.remove('show'),2000)}
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function emptyCard(icon, title, desc, onClick, btnText){
+  return `<div class="empty-card"><div class="ic">${icon}</div><div class="t">${title}</div><div class="d">${desc}</div>${onClick?`<button class="btn-p" onclick="${onClick}">${btnText}</button>`:''}</div>`;
+}
 function page(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('a'));document.getElementById(id).classList.add('a')}
 function closeMo(id){document.getElementById(id).classList.remove('a')}
 document.querySelectorAll('.mo').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('a')})})
@@ -1611,6 +1620,7 @@ function renderShow() {
   const s = gs(); if (!s) { navHome(); return; }
   document.getElementById('showTitle').textContent = s.title;
   document.getElementById('showTitleCn').textContent = s.titleCn || '';
+  renderGuide();
 
   const total = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type!=='sd').length||0),0),0);
   const missing = s.acts.reduce((a,act) => a + act.scenes.reduce((b,sc) => b + (sc.lines?.filter(l=>l.type==='dialogue'&&!l.cn).length||0),0),0);
@@ -1685,6 +1695,59 @@ function saveRename() {
 }
 function navHome() { page('p-home'); renderHome(); }
 function navShow() { page('p-show'); renderShow(); }
+
+function renderGuide() {
+  const s = gs(); if (!s) return;
+  const g = document.getElementById('guideCard');
+  // Compute progress steps
+  const hasScript = (s.acts||[]).length > 0 && s.acts.some(a => (a.scenes||[]).length > 0);
+  const hasActors = s.actors && Object.keys(s.actors).length > 0;
+  const hasMics = (s.mics?.inventory||[]).length > 0;
+  const hasLights = ((s.fixtures||[]).length > 0) || ((s.lightingCues||[]).length > 0);
+  const hasProps = (s.props||[]).length > 0;
+  const hasAudio = (s.audioTracks||[]).length > 0;
+  const hasTech = hasMics || hasLights || hasProps || hasAudio;
+  // Hide if user dismissed or everything done
+  if (s._guideHidden || (hasScript && hasTech)) { g.innerHTML = ''; return; }
+
+  const steps = [
+    { done: hasScript, label: '剧本', sub: '导入或粘贴剧本', onClick: 'showLineImport()', btn: '📄 加剧本', cls: 'btn-g' },
+    { done: hasActors, label: '演员', sub: '把角色分给演员', onClick: 'showActorManager()', btn: '👥 分配演员', cls: 'btn-g' },
+    { done: hasTech, label: '制作', sub: 'Mic / 灯光 / 道具 / 音频', onClick: 'showMicManager()', btn: '🎤 添加Mic', cls: 'btn-g' },
+    { done: hasScript && hasTech, label: '排练', sub: '走戏 + 看cue', onClick: 'startRehearsal()', btn: '🎬 开始排演', cls: 'btn-w' },
+  ];
+  const doneCount = steps.filter(st => st.done).length;
+  const firstNotDone = steps.findIndex(st => !st.done);
+
+  let html = '<div style="background:linear-gradient(135deg,#111827,#1a1a2e);border:1px solid #1a1a1a;border-radius:12px;padding:12px 16px;margin-bottom:12px;">';
+  html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+    <span style="font-size:13px;color:#ddd;"><strong>制作进度</strong> ${doneCount}/${steps.length}</span>
+    <div style="flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden;"><div style="height:100%;width:${(doneCount/steps.length*100)}%;background:#2563eb;border-radius:3px;transition:width .3s;"></div></div>
+    <button class="btn-g btn-sm" onclick="hideGuide()" style="padding:2px 8px;font-size:10px;">✕ 关闭</button>
+  </div>`;
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+  steps.forEach((st, i) => {
+    const isNext = i === firstNotDone;
+    html += `<div style="flex:1;min-width:150px;background:${st.done?'#0a1a0a':'#151515'};border:1px solid ${isNext?'#2563eb':st.done?'#064e3b':'#1a1a1a'};border-radius:10px;padding:10px 12px;">
+      <div style="font-size:12px;color:${st.done?'#6ee7b7':'#888'};margin-bottom:3px;">${st.done?'✅':'①'} <strong>${esc(st.label)}</strong> ${st.done?'已就绪':''}</div>
+      <div style="color:#555;font-size:11px;margin-bottom:8px;">${esc(st.sub)}</div>`;
+    if (!st.done) html += `<button class="${st.cls} btn-sm" onclick="${isNext ? st.onClick : 'highlightStep('+i+')'}" style="padding:3px 10px;font-size:11px;width:100%;">${isNext ? esc(st.btn) : '⋯ 后面再做'}</button>`;
+    html += '</div>';
+  });
+  html += '</div></div>';
+  g.innerHTML = html;
+}
+
+function highlightStep(i) {
+  // For non-next steps, just toast guidance
+  const msgs = ['先完成上一步', '先完成上一步', '先完成上一步', '先排剧本和制作'];
+  t('💡 ' + (msgs[i] || '按顺序来'));
+}
+function hideGuide() {
+  const s = gs(); if (!s) return;
+  s._guideHidden = true; save();
+  document.getElementById('guideCard').innerHTML = '';
+}
 
 // ====================================================================
 //  SCENE EDITOR
@@ -2856,7 +2919,7 @@ function renderMicInventory() {
   html += `<span style="color:#666;font-size:11px;flex:1;text-align:right;">共 ${inv.length} 支</span>`;
   html += '</div>';
   if (!inv.length) {
-    html += '<div class="tm-empty">还没有添加麦克风设备</div>';
+    html += emptyCard('🎤','还没有麦克风','登记你的mic设备：编号、类型、channel。填完才能做按场景分配。','addMic()','＋ 新建第一支Mic');
     document.getElementById('micContentView').innerHTML = html;
     return;
   }
@@ -2924,7 +2987,7 @@ function renderMicAssign() {
     scenes.push({ key: `${ai}-${si}`, label: `${act.name} → ${sc.name}` });
   }));
   let html = '<div class="tm-hint">分配每支mic到各场景的使用者</div>';
-  if (!scenes.length) { html += '<div class="tm-empty">还没有场景数据</div>'; document.getElementById('micContentView').innerHTML = html; return; }
+  if (!scenes.length) { html += emptyCard('🎭','还没有剧本','先去剧本区导入剧本，才有场景可以分配Mic。','navShow()','← 回到剧本'); document.getElementById('micContentView').innerHTML = html; return; }
   scenes.forEach(sc => {
     const scAssign = assign.filter(a => a.sceneKey === sc.key);
     html += `<div style="background:#131313;border:1px solid #1a1a1a;border-radius:8px;padding:10px 14px;margin-bottom:6px;">
@@ -2960,7 +3023,7 @@ function delMicAssign(sceneKey, micId) {
 function renderMicFlow() {
   const s = gs(); const inv = s.mics.inventory || [];
   const assign = s.mics.assignments || [];
-  if (!inv.length) { document.getElementById('micContentView').innerHTML = '<div class="tm-empty">暂无设备</div>'; return; }
+  if (!inv.length) { document.getElementById('micContentView').innerHTML = emptyCard('🎤','暂无设备','先在「📋 设备」里添加Mic。','setMicView(\'inventory\')','← 去添加设备'); return; }
   // Build scene list in order
   const scenes = [];
   s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => {
@@ -3042,7 +3105,7 @@ function renderLightCues() {
   populateSceneSelectors();
   const filter = document.getElementById('lightSceneFilter').value;
   const filtered = filter ? cues.filter(c => c.sceneKey === filter) : cues;
-  if (!filtered.length) { container.innerHTML = html + '<div class="tm-empty">还没有灯光Cue</div>'; return; }
+  if (!filtered.length) { container.innerHTML = html + emptyCard('💡','还没有灯光Cue','先想好这个Cue在哪个场景、灯要变什么，然后添加。','addLightCue()','＋ 新建第一个Cue'); return; }
   const sorted = [...filtered].sort((a,b)=>(a.seq||0)-(b.seq||0));
   html += '<table class="tm-tbl"><tr><th>#</th><th>编号</th><th>描述</th><th>场景</th><th>触发</th><th>操作员</th><th>淡入/淡出</th><th></th></tr>';
   sorted.forEach((c, i) => {
@@ -3100,7 +3163,7 @@ function renderFixtures() {
   let html = '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;"><span style="color:#888;font-size:11px;">灯具清单</span>';
   html += '<button class="btn-s btn-sm" onclick="addFixture()">＋ 添加灯具</button>';
   html += `<span style="color:#555;font-size:11px;flex:1;text-align:right;">${fix.length} 盏灯</span></div>`;
-  if (!fix.length) { container.innerHTML = html + '<div class="tm-empty">还没有添加灯具</div>'; return; }
+  if (!fix.length) { container.innerHTML = html + emptyCard('💡','还没有登记灯具','登记舞台上的灯：channel号+位置+颜色。登记完去🎨看Magic Sheet。','addFixture()','＋ 新建第一盏灯'); return; }
   html += '<table class="tm-tbl"><tr><th>Channel</th><th>位置</th><th>颜色</th><th>用途</th><th></th></tr>';
   fix.forEach((f, i) => {
     const posLabels = { back:'逆光', top:'顶光', front:'面光', side:'侧光', spot:'追光', floor:'地排' };
@@ -3171,7 +3234,7 @@ function delFixture(idx) { if (!confirm('删除此灯具？')) return; gs().fixt
 function renderMagicSheet() {
   const s = gs(); const fix = s.fixtures || [];
   const container = document.getElementById('lightContent');
-  if (!fix.length) { container.innerHTML = '<div class="tm-empty">先在💡灯具tab添加灯具，Magic Sheet自动生成</div>'; return; }
+  if (!fix.length) { container.innerHTML = emptyCard('🎨','先登记灯具','Magic Sheet是根据「💡灯具」里登记的灯自动画出来的。','setLightView(\'fixtures\')','← 去登记灯具'); return; }
   
   // Position layout
   const rows = { back:[], top:[], front:[], side:[], spot:[], floor:[] };
@@ -3677,7 +3740,7 @@ function renderAudioTracks() {
   html += '<button class="btn-s btn-sm" onclick="uploadAudio()">＋ 上传</button>';
   html += `<span style="color:#555;font-size:11px;flex:1;text-align:right;">${tracks.length} 个音轨</span></div>`;
   if (!tracks.length) {
-    html += '<div class="tm-empty">还没有音轨，上传伴奏MP3文件</div>';
+    html += emptyCard('🔊','还没有伴奏音轨','上传歌曲伴奏MP3。文件存在浏览器里，刷新不丢。','uploadAudio()','＋ 上传第一个音轨');
     document.getElementById('audioContent').innerHTML = html; return;
   }
   html += '<table class="tm-tbl"><tr><th>音轨</th><th>时长</th><th>播放</th><th>操作</th></tr>';
@@ -3697,7 +3760,7 @@ function renderAudioCues() {
   html += '<span style="color:#888;font-size:11px;">音频Cue — 在排演模式和导出中显示</span>';
   html += `<span style="color:#555;font-size:11px;flex:1;text-align:right;">${cues.length} 个Cue</span></div>`;
   if (!cues.length) {
-    html += '<div class="tm-empty">先在音轨tab上传文件，点「🎯 绑定」创建Cue</div>';
+    html += emptyCard('🎯','先上传音轨','音轨上传后，在音轨列表点「🎯 绑定」就能创建音频Cue。','setAudioView(\'tracks\')','← 去上传音轨');
     document.getElementById('audioContent').innerHTML = html; return;
   }
   html += '<table class="tm-tbl"><tr><th>触发</th><th>音轨</th><th>场景</th><th>偏移</th><th>备注</th><th></th></tr>';
@@ -3847,7 +3910,7 @@ function renderProps() {
   }
   const list = document.getElementById('propList');
   if (!filtered.length) {
-    list.innerHTML = '<div class="tm-empty">还没有道具，点「＋ 添加道具」开始</div>';
+    list.innerHTML = emptyCard('📦','还没有道具','登记道具：名字、存放位置、负责人。还能设置每场上场/下场时机。','addProp()','＋ 新建第一个道具');
     return;
   }
   let html = '<table class="tm-tbl"><tr><th>道具</th><th>类别</th><th>存放位置</th><th>出现场景</th><th>负责人</th><th>状态</th><th></th></tr>';
@@ -3911,7 +3974,7 @@ function renderPropCues() {
 
   const list = document.getElementById('propList');
   if (!allCues.length) {
-    list.innerHTML = '<div class="tm-empty">还没有道具Cue — 在道具编辑器中为每个场景设置上场/下场时机</div>';
+    list.innerHTML = emptyCard('📍','还没有道具Cue','在「📋 列表」编辑某个道具，为它的每个场景填上场/下场时机。','setPropView(\'list\')','← 去编辑道具');
     return;
   }
 
