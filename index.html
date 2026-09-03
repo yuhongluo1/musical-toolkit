@@ -661,7 +661,7 @@
 
 <!-- CUE EDITOR MODAL (sub-modal for lighting) -->
 <div class="mo" id="cueEditorMo">
-  <div class="md" style="max-width:550px;">
+  <div class="md" style="max-width:620px;">
     <h3 id="cueEditorTitle">编辑Cue</h3>
     <div class="fr">
       <div class="fg"><label>Cue编号</label><input id="cueNum" placeholder="L1"></div>
@@ -673,25 +673,33 @@
         </select>
       </div>
     </div>
-    <div class="fg"><label>描述</label><input id="cueDesc" placeholder="如：全亮暖光、追光BONNIE"></div>
+    <div class="fg"><label>描述（这个cue要让画面变成什么）</label><input id="cueDesc" placeholder="如：全亮暖光、换蓝光、追光BONNIE"></div>
     <div class="fr">
-      <div class="fg"><label>触发位置 <span style="color:#888;font-weight:400;">场景</span></label>
-        <select id="cueScene" style="font-size:12px;padding:6px 10px;"></select>
+      <div class="fg"><label>挂在哪一段（场景）</label>
+        <select id="cueScene" style="font-size:12px;padding:6px 10px;" onchange="onCueSceneChange()"></select>
       </div>
-      <div class="fg"><label>触发时机</label>
-        <select id="cueTiming" style="font-size:12px;padding:6px 10px;">
-          <option value="scene_start">场景开始</option>
-          <option value="song_start">歌曲开始</option>
-          <option value="on_line">指定台词</option>
-          <option value="after_line">台词之后</option>
+      <div class="fg"><label>触发点</label>
+        <select id="cueLine" style="font-size:12px;padding:6px 10px;">
+          <option value="-1">段落开始</option>
         </select>
       </div>
     </div>
-    <div class="fr">
-      <div class="fg"><label>操作员</label><input id="cueOperator" placeholder="小张"></div>
-      <div class="fg"><label>淡入/淡出</label><input id="cueFade" placeholder="3秒 / instant" value="instant"></div>
+    <div class="fg">
+      <label>延迟秒数 <span style="color:#888;font-weight:400;">（伴奏/台词进入后几秒触发，0=立即）</span></label>
+      <input id="cueDelay" type="number" min="0" step="0.5" value="0" placeholder="0">
     </div>
-    <div class="fg"><label>备注</label><input id="cueNote" placeholder="额外说明"></div>
+    <div style="border-top:1px solid #1a1a1a;padding-top:10px;margin-top:4px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="color:#888;font-size:12px;">🔗 这个cue动哪几盏灯</span>
+        <button class="btn-s btn-sm" onclick="addCueChangeRow()">＋ 加一盏</button>
+        <span style="color:#555;font-size:11px;">没有灯具可先用描述，去💡灯具登记</span>
+      </div>
+      <div id="cueChanges"></div>
+    </div>
+    <div class="fr" style="margin-top:8px;">
+      <div class="fg"><label>操作员</label><input id="cueOperator" placeholder="小张"></div>
+      <div class="fg"><label>备注</label><input id="cueNote" placeholder="额外说明"></div>
+    </div>
     <div class="fa">
       <button class="btn-g" onclick="closeMo('cueEditorMo')">取消</button>
       <button class="btn-p" onclick="saveLightCue()">💾 保存</button>
@@ -1847,7 +1855,7 @@ function renderSceneCueList() {
 
   let h = '';
   if (micAssign.length) h += `<div style="font-size:12px;color:#aaa;">🎤 ${micAssign.map(a => `<b style="color:#fdba74;">${esc(a.micId)}</b>→${esc(a.actor)}`).join('，')}</div>`;
-  if (lightCues.length) h += `<div style="font-size:12px;color:#aaa;">💡 ${lightCues.map(c => `<b style="color:#a78bfa;">${esc(c.number)}</b> ${esc(c.desc)}`).join('，')}</div>`;
+  if (lightCues.length) h += `<div style="font-size:12px;color:#aaa;">💡 ${lightCues.map(c => `<b style="color:#a78bfa;">${esc(c.number)}</b> ${esc(c.desc)} @${esc(cueWhenText(s,c))}${cueChangesText(s,c)?' · '+esc(cueChangesText(s,c)):''}`).join('<br>')}</div>`;
   if (propCues.length) h += `<div style="font-size:12px;color:#aaa;">📦 ${propCues.map(p => { const cue = (p.sceneCues||[]).find(c => c.sceneKey===sk); return `<b style="color:#fff;">${esc(p.name)}</b>${cue?.onTime?' ↑'+esc(cue.onTime):''}${cue?.offTime?' ↓'+esc(cue.offTime):''}`; }).join('，')}</div>`;
   if (audioCues.length) h += `<div style="font-size:12px;color:#aaa;">🔊 ${audioCues.map(c => { const t = (s.audioTracks||[]).find(x => x.id===c.trackId); return `<b style="color:#6ee7b7;">${esc(t?.name||'?')}</b>`; }).join('，')}</div>`;
   el.innerHTML = h;
@@ -1860,13 +1868,27 @@ function sceneAddMic() {
   sceneBindMode = true;
   addMicAssign(sceneKey);
 }
+function attachLightCueAtLine(lineIdx) {
+  const sceneKey = `${curAct}-${curScene}`;
+  sceneBindMode = true;
+  addLightCue(); // opens editor for new cue
+  const s = gs();
+  const sel = document.getElementById('cueScene');
+  sel.value = sceneKey;
+  onCueSceneChange();
+  const lineEl = document.getElementById('cueLine');
+  // find the dialogue display-line index matching the raw line array index
+  if (lineEl) lineEl.value = String(lineIdx);
+}
 function sceneAddLight() {
   const sceneKey = `${curAct}-${curScene}`;
   sceneBindMode = true;
   addLightCue(); // opens editor for new cue
-  // Pre-select current scene in the dropdown
+  // Pre-select current scene in the dropdown + refresh its line list
   const sel = document.getElementById('cueScene');
   sel.value = sceneKey;
+  onCueSceneChange();
+  document.getElementById('cueLine').value = '-1';
 }
 function sceneAddProp() {
   const sceneKey = `${curAct}-${curScene}`;
@@ -1939,6 +1961,7 @@ function renderLines() {
           <div class="c ${l.cn?'':'ms'}">${l.cn ? esc(l.cn) : '⚠️ 缺翻译'}</div>
         </div>
         <div class="ac">
+          <button onclick="attachLightCueAtLine(${ri})" title="在这句挂灯cue">💡</button>
           <button onclick="openLineEditor(${ri})" title="编辑">✏️</button>
           <button onclick="moveLine(${ri},-1)" title="上移">↑</button>
           <button onclick="moveLine(${ri},1)" title="下移">↓</button>
@@ -3253,19 +3276,57 @@ function renderLightCues() {
   populateSceneSelectors();
   const filter = document.getElementById('lightSceneFilter').value;
   const filtered = filter ? cues.filter(c => c.sceneKey === filter) : cues;
-  if (!filtered.length) { container.innerHTML = html + emptyCard('💡','还没有灯光Cue','先想好这个Cue在哪个场景、灯要变什么，然后添加。','addLightCue()','＋ 新建第一个Cue'); return; }
+  if (!filtered.length) { container.innerHTML = html + emptyCard('💡','还没有灯光Cue','点「＋ 添加Cue」：选场景、选触发点(第几句/延迟几秒)、然后指定动哪几盏灯。','addLightCue()','＋ 新建第一个Cue'); return; }
   const sorted = [...filtered].sort((a,b)=>(a.seq||0)-(b.seq||0));
-  html += '<table class="tm-tbl"><tr><th>#</th><th>编号</th><th>描述</th><th>场景</th><th>触发</th><th>操作员</th><th>淡入/淡出</th><th></th></tr>';
+  html += '<table class="tm-tbl"><tr><th>#</th><th>编号</th><th>描述</th><th>触发</th><th>动哪几盏灯</th><th>操作员</th><th></th></tr>';
   sorted.forEach((c, i) => {
-    const t = c.type==='lighting'?'💡灯':c.type==='sound'?'🔊音':'✨效';
+    const trig = cueTriggerLabel(s, c);
+    const changes = (c.changes||[]).map(ch => {
+      const f = (s.fixtures||[]).find(x => String(x.ch) === String(ch.ch));
+      return `<span class="tag tag-light">${f ? f.ch : ch.ch}${ch.level!==undefined&&ch.level!=='' ? '→'+ch.level+'%' : ''}${ch.fade? ' '+ch.fade+'s':''}</span>`;
+    }).join(' ');
     html += `<tr><td>${i+1}</td><td><strong style="color:#a78bfa;">${esc(c.number||'')}</strong></td>
-      <td style="color:#ddd;">${esc(c.desc||'')}</td><td style="color:#666;font-size:11px;">${esc(c.sceneLabel||'')}</td>
-      <td style="color:#888;font-size:11px;">${esc(c.timingLabel||'')}</td><td style="color:#aaa;">${esc(c.operator||'')}</td>
-      <td style="color:#555;font-size:11px;">${esc(c.fade||'instant')}</td>
+      <td style="color:#ddd;">${esc(c.desc||'')}</td>
+      <td style="color:#888;font-size:11px;">${trig}</td>
+      <td style="font-size:11px;">${changes || '<span style="color:#444;">—</span>'}</td>
+      <td style="color:#aaa;">${esc(c.operator||'')}</td>
       <td><button class="tm-btn-sm" onclick="editLightCue(${i})">✏️</button><button class="tm-btn-sm" onclick="delLightCue(${i})">🗑</button></td></tr>`;
   });
   html += '</table>';
   container.innerHTML = html;
+}
+
+function cueTriggerLabel(s, c) {
+  let base = '';
+  const [ai, si] = (c.sceneKey||'').split('-').map(Number);
+  const sc = s.acts[ai]?.scenes[si];
+  if (!sc) base = c.sceneLabel || c.sceneKey || '';
+  const lineIdx = c.lineIdx !== undefined && c.lineIdx >= 0 ? c.lineIdx : null;
+  if (lineIdx !== null && sc) {
+    const l = sc.lines[lineIdx];
+    const who = l ? (l.char ? l.char + ': ' : '') + (l.en||l.cn||'').slice(0,30) : '台词';
+    base = `第${lineIdx+1}句 «${esc(who)}»`;
+  } else {
+    base = (sc ? esc(sc.name) : esc(base)) + ' 开头';
+  }
+  const delay = parseFloat(c.delay) || 0;
+  return base + (delay > 0 ? ` +${delay}s` : '');
+}
+
+function cueChangesText(s, c) {
+  const changes = c.changes || [];
+  if (!changes.length) return '';
+  return changes.map(ch => {
+    const f = (s.fixtures||[]).find(x => String(x.ch) === String(ch.ch));
+    const who = f ? ('CH' + f.ch + (f.purpose?(' '+f.purpose):'')) : ('CH' + ch.ch);
+    const lv = ch.level !== undefined && ch.level !== '' ? '→' + ch.level + '%' : '';
+    const fd = ch.fade ? (' ' + ch.fade + 's') : '闪变';
+    return `${who} ${lv}${fd}`;
+  }).join(' / ');
+}
+
+function cueWhenText(s, c) {
+  return cueTriggerLabel(s, c);
 }
 
 function populateCueSceneSelect() {
@@ -3278,37 +3339,123 @@ function populateCueSceneSelect() {
   }));
 }
 
+function onCueSceneChange() {
+  const sel = document.getElementById('cueScene').value;
+  const lineSel = document.getElementById('cueLine');
+  if (!lineSel) return;
+  lineSel.innerHTML = '<option value="-1">段落开始</option>';
+  const s = gs(); if (!s) return;
+  const [ai, si] = sel.split('-').map(Number);
+  const sc = s.acts[ai]?.scenes[si];
+  if (!sc) return;
+  (sc.lines||[]).forEach((l, i) => {
+    if (l.type === 'dialogue') {
+      const who = l.char ? l.char + ': ' : '';
+      const txt = (l.en||l.cn||'').slice(0,30);
+      lineSel.innerHTML += `<option value="${i}">第${i+1}句 ${esc(who+txt)}</option>`;
+    }
+  });
+}
+
+function addCueChangeRow() {
+  const s = gs(); if (!s) return;
+  const box = document.getElementById('cueChanges');
+  if (!box) return;
+  const row = document.createElement('div');
+  row.className = 'cue-change-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:5px;align-items:center;flex-wrap:wrap;';
+  let opts = '';
+  const fix = s.fixtures || [];
+  if (fix.length) {
+    fix.forEach(f => { opts += `<option value="${esc(f.ch)}">CH${esc(f.ch)} ${esc(f.purpose||'')}</option>`; });
+  } else {
+    opts = '<option value="">CH 未登记</option>';
+  }
+  row.innerHTML = `
+    <select class="cc-ch" style="max-width:110px;font-size:11px;padding:4px 6px;flex:1;">${opts}</select>
+    <span style="color:#555;font-size:11px;">→</span>
+    <input class="cc-level" type="number" min="0" max="100" placeholder="亮度%" style="max-width:70px;font-size:11px;padding:4px 6px;">
+    <input class="cc-fade" type="number" min="0" placeholder="变几秒" style="max-width:70px;font-size:11px;padding:4px 6px;">
+    <button class="tm-btn-sm" onclick="this.parentElement.remove()">✕</button>`;
+  box.appendChild(row);
+}
+
+function renderCueChanges(changes) {
+  const box = document.getElementById('cueChanges');
+  if (!box) return;
+  box.innerHTML = '';
+  (changes||[]).forEach(ch => {
+    const s = gs();
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;margin-bottom:5px;align-items:center;flex-wrap:wrap;';
+    let opts = '';
+    const fix = s.fixtures || [];
+    if (fix.length) {
+      fix.forEach(f => { opts += `<option value="${esc(f.ch)}" ${String(f.ch)===String(ch.ch)?'selected':''}>CH${esc(f.ch)} ${esc(f.purpose||'')}</option>`; });
+    } else { opts = `<option value="${esc(ch.ch)}">CH${esc(ch.ch)}</option>`; }
+    row.innerHTML = `
+      <select class="cc-ch" style="max-width:110px;font-size:11px;padding:4px 6px;flex:1;">${opts}</select>
+      <span style="color:#555;font-size:11px;">→</span>
+      <input class="cc-level" type="number" min="0" max="100" placeholder="亮度%" value="${ch.level!==undefined?esc(ch.level):''}" style="max-width:70px;font-size:11px;padding:4px 6px;">
+      <input class="cc-fade" type="number" min="0" placeholder="变几秒" value="${ch.fade!==undefined?esc(ch.fade):''}" style="max-width:70px;font-size:11px;padding:4px 6px;">
+      <button class="tm-btn-sm" onclick="this.parentElement.remove()">✕</button>`;
+    box.appendChild(row);
+  });
+}
+
+function collectCueChanges() {
+  const rows = document.querySelectorAll('#cueChanges .cue-change-row');
+  const out = [];
+  rows.forEach(r => {
+    const ch = r.querySelector('.cc-ch').value;
+    const level = r.querySelector('.cc-level').value;
+    const fade = r.querySelector('.cc-fade').value;
+    if (ch) out.push({ ch, level: level===''?undefined:level, fade: fade===''?undefined:fade });
+  });
+  return out;
+}
+
 function addLightCue() {
   editingCueIdx = -1; const s = gs();
   document.getElementById('cueEditorTitle').textContent = '➕ 添加Cue';
-  populateCueSceneSelect();
+  populateCueSceneSelect(); onCueSceneChange();
   document.getElementById('cueNum').value = `L${(s.lightingCues||[]).length+1}`;
   document.getElementById('cueType').value = 'lighting'; document.getElementById('cueDesc').value = '';
-  document.getElementById('cueTiming').value = 'scene_start'; document.getElementById('cueOperator').value = '';
-  document.getElementById('cueFade').value = 'instant'; document.getElementById('cueNote').value = '';
+  document.getElementById('cueLine').value = '-1';
+  document.getElementById('cueDelay').value = '0';
+  renderCueChanges([]);
+  document.getElementById('cueOperator').value = '';
+  document.getElementById('cueNote').value = '';
   closeMo('lightMo'); document.getElementById('cueEditorMo').classList.add('a');
 }
 function editLightCue(idx) {
   const s = gs(); const c = s.lightingCues[idx]; if (!c) return;
   editingCueIdx = idx; document.getElementById('cueEditorTitle').textContent = '✏️ 编辑Cue';
-  populateCueSceneSelect();
+  populateCueSceneSelect(); document.getElementById('cueScene').value = c.sceneKey||'';
+  onCueSceneChange();
   document.getElementById('cueNum').value = c.number||''; document.getElementById('cueType').value = c.type||'lighting';
-  document.getElementById('cueDesc').value = c.desc||''; document.getElementById('cueScene').value = c.sceneKey||'';
-  document.getElementById('cueTiming').value = c.timing||'scene_start'; document.getElementById('cueOperator').value = c.operator||'';
-  document.getElementById('cueFade').value = c.fade||'instant'; document.getElementById('cueNote').value = c.note||'';
+  document.getElementById('cueDesc').value = c.desc||'';
+  const lineEl = document.getElementById('cueLine');
+  lineEl.value = (c.lineIdx !== undefined && c.lineIdx >= 0) ? String(c.lineIdx) : '-1';
+  document.getElementById('cueDelay').value = c.delay || 0;
+  renderCueChanges(c.changes||[]);
+  document.getElementById('cueOperator').value = c.operator||'';
+  document.getElementById('cueNote').value = c.note||'';
   closeMo('lightMo'); document.getElementById('cueEditorMo').classList.add('a');
 }
 function saveLightCue() {
   const s = gs(); if (!s) return; const number = document.getElementById('cueNum').value.trim();
   if (!number) { t('请输入Cue编号'); return; }
   const type = document.getElementById('cueType').value; const desc = document.getElementById('cueDesc').value.trim();
-  const sceneKey = document.getElementById('cueScene').value; const timing = document.getElementById('cueTiming').value;
-  const operator = document.getElementById('cueOperator').value.trim(); const fade = document.getElementById('cueFade').value.trim();
+  const sceneKey = document.getElementById('cueScene').value;
+  const lineIdx = parseInt(document.getElementById('cueLine').value) || -1;
+  const delay = parseFloat(document.getElementById('cueDelay').value) || 0;
+  const operator = document.getElementById('cueOperator').value.trim();
   const note = document.getElementById('cueNote').value.trim();
+  const changes = collectCueChanges();
   let sceneLabel = '';
   try { const [ai,si]=sceneKey.split('-').map(Number); if(s.acts[ai]&&s.acts[ai].scenes[si]) sceneLabel=`${s.acts[ai].name} → ${s.acts[ai].scenes[si].name}`; } catch(e){}
-  const timingLabels = { scene_start:'场景开始', song_start:'歌曲开始', on_line:'指定台词', after_line:'台词之后' };
-  const cueData = { number,type,desc,sceneKey,sceneLabel,timing,timingLabel:timingLabels[timing]||timing,operator,fade,note,seq:(s.lightingCues||[]).length };
+  const cueData = { number,type,desc,sceneKey,sceneLabel,lineIdx,delay,operator,note,changes,seq:(s.lightingCues||[]).length };
   if (!s.lightingCues) s.lightingCues = [];
   if (editingCueIdx >= 0) { cueData.seq = s.lightingCues[editingCueIdx].seq; s.lightingCues[editingCueIdx] = cueData; }
   else s.lightingCues.push(cueData);
@@ -3507,7 +3654,7 @@ function updateSmMic(line) {
 function updateSmLights(line) {
   const s = gs(); const sk = getSceneKey(line); if (!sk) { document.getElementById('smLight').innerHTML = '—'; return; }
   const cues = (s.lightingCues||[]).filter(c => c.sceneKey===sk);
-  document.getElementById('smLight').innerHTML = cues.length ? cues.map(c => `<div class="item"><span class="tag tag-light">${c.number}</span> ${c.desc} (${c.timingLabel})</div>`).join('') : '<div style="color:#444;font-size:11px;">—</div>';
+  document.getElementById('smLight').innerHTML = cues.length ? cues.map(c => `<div class="item"><span class="tag tag-light">${esc(c.number)}</span> ${esc(c.desc||'')} — ${esc(cueWhenText(s,c))}<br><span style="color:#a78bfa;font-size:11px;">${esc(cueChangesText(s,c))||''}</span></div>`).join('') : '<div style="color:#444;font-size:11px;">—</div>';
 }
 
 function updateSmProps(line) {
@@ -3605,7 +3752,7 @@ function updateRhLights(line) {
   s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => { if (act.name===line._act && sc.name===line._scene) sk=`${ai}-${si}`; }));
   const cues = (s.lightingCues||[]).filter(c => c.sceneKey===sk);
   if (!cues.length) { document.getElementById('rhLightPanel').innerHTML = '<div style="color:#444;font-size:11px;">暂无Cue</div>'; return; }
-  document.getElementById('rhLightPanel').innerHTML = cues.map(c => `<div class="item"><span class="lbl">${esc(c.number||'')}</span><span style="color:#a78bfa;">${esc(c.desc||'')}</span><span style="color:#555;font-size:10px;">${esc(c.timingLabel||'')}${c.operator?' · '+esc(c.operator):''}</span></div>`).join('');
+  document.getElementById('rhLightPanel').innerHTML = cues.map(c => `<div class="item"><span class="lbl">${esc(c.number||'')}</span><span style="color:#a78bfa;">${esc(c.desc||'')}</span><span style="color:#555;font-size:10px;">${esc(cueWhenText(s,c))}${cueChangesText(s,c)?' · '+esc(cueChangesText(s,c)):''}${c.operator?' · '+esc(c.operator):''}</span></div>`).join('');
 }
 
 function updateRhProps(line) {
@@ -3688,9 +3835,9 @@ function exportLights() {
   const s = gs(); if (!s) return;
   const cues = s.lightingCues || [];
   const sorted = [...cues].sort((a,b)=>(a.seq||0)-(b.seq||0));
-  let rows = '<tr><th>#</th><th>编号</th><th>描述</th><th>场景</th><th>触发</th><th>操作员</th><th>淡入/淡出</th></tr>';
+  let rows = '<tr><th>#</th><th>编号</th><th>描述</th><th>触发</th><th>动哪几盏灯</th><th>操作员</th></tr>';
   sorted.forEach((c,i) => {
-    rows += `<tr><td>${i+1}</td><td>${esc(c.number||'')}</td><td>${esc(c.desc||'')}</td><td>${esc(c.sceneLabel||'')}</td><td>${esc(c.timingLabel||'')}</td><td>${esc(c.operator||'')}</td><td>${esc(c.fade||'instant')}</td></tr>`;
+    rows += `<tr><td>${i+1}</td><td>${esc(c.number||'')}</td><td>${esc(c.desc||'')}</td><td>${esc(cueWhenText(s,c))}</td><td style="font-size:11px;">${esc(cueChangesText(s,c))||'—'}</td><td>${esc(c.operator||'')}</td></tr>`;
   });
   const html = `<html><head><meta charset="utf-8"><title>灯光Cue表 - ${s.title}</title><style>
     body{font-family:sans-serif;padding:24px;color:#222}
@@ -3791,7 +3938,7 @@ function exportCueScript(type) {
       }
       if (showLight) {
         const l = lightByScene[sk]||[];
-        if (l.length) notes.push(`💡 ${l.map(c => `${c.number} ${c.desc} (${c.timingLabel})${c.operator?' - '+c.operator:''}`).join(' / ')}`);
+        if (l.length) notes.push(`💡 ${l.map(c => `${c.number} ${c.desc} @${cueWhenText(s,c)}${cueChangesText(s,c)?' ['+cueChangesText(s,c)+']':''}${c.operator?' - '+c.operator:''}`).join(' / ')}`);
       }
       if (showProp) {
         const p = propByScene[sk]||[];
