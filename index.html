@@ -328,6 +328,7 @@
 <div id="hdr">
   <h1>🎭 工具包</h1>
   <div class="ha">
+    <button class="btn-g btn-sm" onclick="showLicense()">📜 授权</button>
     <button class="btn-g btn-sm" onclick="showSettings()">⚙️</button>
     <button class="btn-g btn-sm" onclick="exportAll()">📤 导出</button>
     <button class="btn-g btn-sm" onclick="document.getElementById('impFile').click()">📥 导入</button>
@@ -869,6 +870,36 @@
     <div class="fa">
       <button class="btn-g" onclick="closeMo('propEditorMo')">取消</button>
       <button class="btn-p" onclick="saveProp()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- LICENSE MODAL -->
+<div class="mo" id="licenseMo">
+  <div class="md" style="max-width:600px;">
+    <h3>📜 使用授权声明</h3>
+    <div style="background:#151515;border:1px solid #222;border-radius:8px;padding:16px 18px;font-size:13px;color:#ccc;line-height:1.8;margin-bottom:14px;">
+      <p style="color:#fff;font-weight:600;margin-bottom:8px;">🎭 音乐剧制作工具包</p>
+      <p style="margin-bottom:10px;">作者：罗雨虹（Yuhong Luo）<br>© 2026 版权所有 · All Rights Reserved</p>
+      <hr style="border:none;border-top:1px solid #222;margin:12px 0;">
+      <p style="margin-bottom:8px;"><strong style="color:#fff;">✅ 允许：</strong></p>
+      <p style="margin-left:14px;margin-bottom:10px;">
+        · 学校剧团免费使用<br>
+        · 排练、演出等校内非商业用途<br>
+        · 转发链接给需要的人
+      </p>
+      <p style="margin-bottom:8px;"><strong style="color:#fff;">❌ 禁止：</strong></p>
+      <p style="margin-left:14px;margin-bottom:10px;">
+        · 复制、修改后声称是自己的工作<br>
+        · 商业用途或出售<br>
+        · 去除或遮挡作者署名与版权标记<br>
+        · 未经许可二次发布或上传到其他平台
+      </p>
+      <hr style="border:none;border-top:1px solid #222;margin:12px 0;">
+      <p style="color:#888;font-size:12px;">如需合作、商用或转载，请联系作者授权。<br>本工具免费面向学校戏剧社团，请尊重原创劳动。</p>
+    </div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('licenseMo')">知道了</button>
     </div>
   </div>
 </div>
@@ -2327,6 +2358,10 @@ async function showTranslateAll() {
 // ====================================================================
 //  SETTINGS / LOCAL TRANSLATION
 // ====================================================================
+function showLicense() {
+  document.getElementById('licenseMo').classList.add('a');
+}
+
 function showSettings() {
   const eng = localStorage.getItem('st3_trEngine') || 'auto';
   document.getElementById('trEngine').value = eng;
