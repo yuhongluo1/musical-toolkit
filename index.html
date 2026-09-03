@@ -650,6 +650,7 @@
       <div style="flex:1;"></div>
       <div style="display:flex;gap:4px;">
         <button class="btn-sm" id="lightViewCues" onclick="setLightView('cues')" style="background:#2563eb;color:#fff;">📋 Cue表</button>
+        <button class="btn-sm" id="lightViewStack" onclick="setLightView('stack')" style="background:#333;color:#ccc;">▶ 走表</button>
         <button class="btn-sm" id="lightViewFixtures" onclick="setLightView('fixtures')" style="background:#333;color:#ccc;">💡 灯具</button>
         <button class="btn-sm" id="lightViewMagic" onclick="setLightView('magic')" style="background:#333;color:#ccc;">🎨 Magic Sheet</button>
       </div>
@@ -689,10 +690,14 @@
       <input id="cueDelay" type="number" min="0" step="0.5" value="0" placeholder="0">
     </div>
     <div style="border-top:1px solid #1a1a1a;padding-top:10px;margin-top:4px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
         <span style="color:#888;font-size:12px;">🔗 这个cue动哪几盏灯</span>
         <button class="btn-s btn-sm" onclick="addCueChangeRow()">＋ 加一盏</button>
-        <span style="color:#555;font-size:11px;">没有灯具可先用描述，去💡灯具登记</span>
+        <select id="cueGroupAdd" style="max-width:150px;font-size:11px;padding:3px 6px;" onchange="this.dataset.g=this.value">
+          <option value="">按灯组添加…</option>
+        </select>
+        <button class="btn-g btn-sm" onclick="var s=document.getElementById('cueGroupAdd');if(s.value)addGroupToCue(s.value)" id="cueGroupAddBtn">＋ 整组</button>
+        <span style="color:#555;font-size:11px;">灯具/灯组在💡灯具里管理</span>
       </div>
       <div id="cueChanges"></div>
     </div>
@@ -703,6 +708,20 @@
     <div class="fa">
       <button class="btn-g" onclick="closeMo('cueEditorMo')">取消</button>
       <button class="btn-p" onclick="saveLightCue()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHT GROUP MODAL -->
+<div class="mo" id="groupMo">
+  <div class="md" style="max-width:460px;">
+    <h3>🎛 新建灯组</h3>
+    <p style="color:#888;font-size:13px;margin-bottom:10px;">灯组 = 把几盏灯打包（如"面光组"），编cue时一键整组加。</p>
+    <div class="fg"><label>灯组名 *</label><input id="grpName" placeholder="面光组 / 天幕蓝 / 追光"></div>
+    <div class="fg"><label>勾选包含的灯</label><div id="grpList" style="max-height:32vh;overflow-y:auto;border:1px solid #1a1a1a;border-radius:8px;padding:8px;"></div></div>
+    <div class="fa">
+      <button class="btn-g" onclick="closeMo('groupMo')">取消</button>
+      <button class="btn-p" onclick="saveGroup()">💾 保存</button>
     </div>
   </div>
 </div>
@@ -1168,6 +1187,8 @@ function load(){
   data.shows.forEach(s => {
     if (!s.mics) s.mics = { inventory: [], assignments: [] };
     if (!s.lightingCues) s.lightingCues = [];
+    if (!s.fixtures) s.fixtures = [];
+    if (!s.groups) s.groups = [];
     if (!s.props) s.props = [];
     if (!s.micQuickChanges) s.micQuickChanges = [];
     // Migrate old cue format
@@ -3240,18 +3261,81 @@ function showLightingCues() {
 }
 
 function setLightView(view) {
+  currentLightView = view;
   setLightViewTabs(view);
   if (view === 'cues') renderLightCues();
+  else if (view === 'stack') renderCueStack();
   else if (view === 'fixtures') renderFixtures();
   else renderMagicSheet();
 }
 
+let currentLightView = 'cues';
+
 function setLightViewTabs(view) {
-  ['cues','fixtures','magic'].forEach(v => {
+  ['cues','stack','fixtures','magic'].forEach(v => {
     const el = document.getElementById('lightView'+v.charAt(0).toUpperCase()+v.slice(1));
     if (el) { el.style.background = v === view ? '#2563eb' : '#333'; el.style.color = v === view ? '#fff' : '#ccc'; }
   });
 }
+
+let stackIdx = 0; // next cue to fire (standby)
+
+function renderCueStack() {
+  const s = gs(); const container = document.getElementById('lightContent');
+  const cues = [...(s.lightingCues||[])].sort((a,b)=>(a.seq||0)-(b.seq||0));
+  if (!cues.length) { container.innerHTML = emptyCard('💡','还没有Cue','先在「📋 Cue表」添加cue，然后这里就能按演出顺序一条条走。','setLightView(\'cues\')','← 去添加Cue'); return; }
+  if (stackIdx > cues.length) stackIdx = cues.length;
+  
+  let html = '<div style="color:#888;font-size:11px;margin-bottom:8px;">▶ 走表：像调光师一样，从上到下一行一行走。当前待执行行高亮。</div>';
+  
+  // Current standby cue big display
+  if (stackIdx < cues.length) {
+    const cur = cues[stackIdx];
+    const changes = cueChangesText(s, cur);
+    html += `<div style="background:#15151f;border:2px solid #2563eb;border-radius:10px;padding:12px 16px;margin-bottom:10px;">
+      <div style="color:#93c5fd;font-size:11px;margin-bottom:4px;">NEXT / 待执行</div>
+      <div style="font-size:18px;color:#fff;font-weight:700;">${esc(cur.number||('L'+(stackIdx+1)))} ${esc(cur.desc||'')}</div>
+      <div style="color:#888;font-size:12px;margin-top:3px;">⏱ ${esc(cueWhenText(s,cur))}${cur.operator?' · '+esc(cur.operator):''}</div>
+      ${changes ? `<div style="color:#a78bfa;font-size:13px;margin-top:6px;">${esc(changes)}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn-g btn-sm" onclick="stackBack()">← 上一条</button>
+        <button class="btn-p" onclick="stackGo()" style="flex:1;font-size:16px;padding:10px;">GO ▶</button>
+      </div>
+    </div>`;
+  } else {
+    html += `<div style="background:#0f1f0f;border:1px solid #1e3a1e;border-radius:10px;padding:16px;text-align:center;color:#6ee7b7;margin-bottom:10px;">🎉 全部cue已走完</div>`;
+    html += `<div style="text-align:center;margin:8px 0;"><button class="btn-g btn-sm" onclick="stackReset()">↺ 从头开始</button></div>`;
+  }
+  
+  // The full list
+  html += '<div style="max-height:42vh;overflow-y:auto;border:1px solid #1a1a1a;border-radius:8px;">';
+  cues.forEach((c, i) => {
+    const done = i < stackIdx;
+    const isNext = i === stackIdx;
+    const changes = cueChangesText(s, c);
+    html += `<div style="padding:6px 12px;border-bottom:1px solid #131313;display:flex;gap:8px;align-items:center;${done?'opacity:.45;':''}${isNext?'background:#1e3a5f;border-left:3px solid #2563eb;':''}">
+      <span style="color:${isNext?'#93c5fd':'#555'};font-size:11px;min-width:28px;">${done?'✓':'#'+(i+1)}</span>
+      <span style="color:${isNext?'#fff':'#ddd'};font-size:13px;min-width:52px;">${esc(c.number||('L'+(i+1)))}</span>
+      <span style="flex:1;color:${isNext?'#fff':'#aaa'};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(c.desc||'')}</span>
+      ${changes?`<span style="color:#a78bfa;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(changes)}</span>`:''}
+      <span style="color:#555;font-size:10px;white-space:nowrap;">${esc(cueWhenText(s,c))}</span>
+    </div>`;
+  });
+  html += '</div>';
+  if (stackIdx < cues.length) html += '<div style="color:#555;font-size:11px;margin-top:6px;">💡 空格/→ 也等于按GO。走表不影响cue数据，只是排练/演出时跟进度用。</div>';
+  container.innerHTML = html;
+}
+
+function stackGo() { stackIdx++; renderCueStack(); }
+function stackBack() { if (stackIdx > 0) stackIdx--; renderCueStack(); }
+function stackReset() { stackIdx = 0; renderCueStack(); }
+
+document.addEventListener('keydown', e => {
+  const mo = document.getElementById('lightMo');
+  if (!mo || !mo.classList.contains('a') || currentLightView !== 'stack') return;
+  if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); stackGo(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); stackBack(); }
+});
 
 function populateSceneSelectors() {
   const s = gs(); if (!s) return;
@@ -3369,50 +3453,11 @@ function onCueSceneChange() {
   });
 }
 
-function addCueChangeRow() {
-  const s = gs(); if (!s) return;
-  const box = document.getElementById('cueChanges');
-  if (!box) return;
-  const row = document.createElement('div');
-  row.className = 'cue-change-row';
-  row.style.cssText = 'display:flex;gap:6px;margin-bottom:5px;align-items:center;flex-wrap:wrap;';
-  let opts = '';
-  const fix = s.fixtures || [];
-  if (fix.length) {
-    fix.forEach(f => { opts += `<option value="${esc(f.ch)}">CH${esc(f.ch)} ${esc(f.purpose||'')}</option>`; });
-  } else {
-    opts = '<option value="">CH 未登记</option>';
-  }
-  row.innerHTML = `
-    <select class="cc-ch" style="max-width:110px;font-size:11px;padding:4px 6px;flex:1;">${opts}</select>
-    <span style="color:#555;font-size:11px;">→</span>
-    <input class="cc-level" type="number" min="0" max="100" placeholder="亮度%" style="max-width:70px;font-size:11px;padding:4px 6px;">
-    <input class="cc-fade" type="number" min="0" placeholder="变几秒" style="max-width:70px;font-size:11px;padding:4px 6px;">
-    <button class="tm-btn-sm" onclick="this.parentElement.remove()">✕</button>`;
-  box.appendChild(row);
-}
-
 function renderCueChanges(changes) {
   const box = document.getElementById('cueChanges');
   if (!box) return;
   box.innerHTML = '';
-  (changes||[]).forEach(ch => {
-    const s = gs();
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:6px;margin-bottom:5px;align-items:center;flex-wrap:wrap;';
-    let opts = '';
-    const fix = s.fixtures || [];
-    if (fix.length) {
-      fix.forEach(f => { opts += `<option value="${esc(f.ch)}" ${String(f.ch)===String(ch.ch)?'selected':''}>CH${esc(f.ch)} ${esc(f.purpose||'')}</option>`; });
-    } else { opts = `<option value="${esc(ch.ch)}">CH${esc(ch.ch)}</option>`; }
-    row.innerHTML = `
-      <select class="cc-ch" style="max-width:110px;font-size:11px;padding:4px 6px;flex:1;">${opts}</select>
-      <span style="color:#555;font-size:11px;">→</span>
-      <input class="cc-level" type="number" min="0" max="100" placeholder="亮度%" value="${ch.level!==undefined?esc(ch.level):''}" style="max-width:70px;font-size:11px;padding:4px 6px;">
-      <input class="cc-fade" type="number" min="0" placeholder="变几秒" value="${ch.fade!==undefined?esc(ch.fade):''}" style="max-width:70px;font-size:11px;padding:4px 6px;">
-      <button class="tm-btn-sm" onclick="this.parentElement.remove()">✕</button>`;
-    box.appendChild(row);
-  });
+  (changes||[]).forEach(ch => appendCueChangeRow(ch));
 }
 
 function collectCueChanges() {
@@ -3427,10 +3472,19 @@ function collectCueChanges() {
   return out;
 }
 
+function populateCueGroupAdd() {
+  const s = gs(); if (!s) return;
+  const sel = document.getElementById('cueGroupAdd');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">按灯组添加…</option>';
+  (s.groups||[]).forEach(g => { sel.innerHTML += `<option value="${esc(g.name)}">${esc(g.name)} (${g.chs.length}灯)</option>`; });
+}
+
 function addLightCue() {
   editingCueIdx = -1; const s = gs();
   document.getElementById('cueEditorTitle').textContent = '➕ 添加Cue';
   populateCueSceneSelect(); onCueSceneChange();
+  populateCueGroupAdd();
   document.getElementById('cueNum').value = `L${(s.lightingCues||[]).length+1}`;
   document.getElementById('cueType').value = 'lighting'; document.getElementById('cueDesc').value = '';
   document.getElementById('cueLine').value = '-1';
@@ -3445,6 +3499,7 @@ function editLightCue(idx) {
   editingCueIdx = idx; document.getElementById('cueEditorTitle').textContent = '✏️ 编辑Cue';
   populateCueSceneSelect(); document.getElementById('cueScene').value = c.sceneKey||'';
   onCueSceneChange();
+  populateCueGroupAdd();
   document.getElementById('cueNum').value = c.number||''; document.getElementById('cueType').value = c.type||'lighting';
   document.getElementById('cueDesc').value = c.desc||'';
   const lineEl = document.getElementById('cueLine');
@@ -3481,9 +3536,27 @@ function delLightCue(idx) { if (!confirm('删除此Cue？')) return; gs().lighti
 function renderFixtures() {
   const s = gs(); const fix = s.fixtures || [];
   const container = document.getElementById('lightContent');
-  let html = '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;"><span style="color:#888;font-size:11px;">灯具清单</span>';
+  let html = '<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;"><span style="color:#888;font-size:11px;">灯具清单</span>';
   html += '<button class="btn-s btn-sm" onclick="addFixture()">＋ 添加灯具</button>';
   html += `<span style="color:#555;font-size:11px;flex:1;text-align:right;">${fix.length} 盏灯</span></div>`;
+  // Groups section
+  const groups = s.groups || [];
+  html += '<div style="background:#131313;border:1px solid #1a1a1a;border-radius:8px;padding:8px 12px;margin-bottom:10px;">';
+  html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+  html += '<span style="color:#888;font-size:11px;">🎛 灯组（把常用灯打包，编cue时一键整组加）</span>';
+  html += '<button class="btn-s btn-sm" onclick="openGroupMo()">＋ 新建灯组</button>';
+  html += '</div>';
+  if (groups.length) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">';
+    groups.forEach((g, gi) => {
+      html += `<span style="background:#1e3a5f;color:#93c5fd;border-radius:8px;padding:3px 10px;font-size:12px;">${esc(g.name)} <span style="color:#64748b;">(${g.chs.length}灯)</span>
+        <button class="tm-btn-sm" onclick="delGroup(${gi})" style="margin-left:3px;">✕</button></span>`;
+    });
+    html += '</div>';
+  } else if (fix.length) {
+    html += '<div style="color:#444;font-size:11px;margin-top:6px;">还没有灯组。比如把 CH1-6 面光打包成"面光组"，cue里直接加整组。</div>';
+  }
+  html += '</div>';
   if (!fix.length) { container.innerHTML = html + emptyCard('💡','还没有登记灯具','登记舞台上的灯：channel号+位置+颜色。登记完去🎨看Magic Sheet。','addFixture()','＋ 新建第一盏灯'); return; }
   html += '<table class="tm-tbl"><tr><th>Channel</th><th>位置</th><th>颜色</th><th>用途</th><th></th></tr>';
   fix.forEach((f, i) => {
@@ -3496,6 +3569,66 @@ function renderFixtures() {
   });
   html += '</table>';
   container.innerHTML = html;
+}
+
+// --- Light Groups ---
+function openGroupMo() {
+  const s = gs(); if (!s) return;
+  const fix = s.fixtures || [];
+  if (!fix.length) { t('先登记灯具'); return; }
+  document.getElementById('grpName').value = '';
+  const box = document.getElementById('grpList');
+  box.innerHTML = fix.map((f, i) =>
+    `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#ccc;padding:3px 6px;cursor:pointer;">
+      <input type="checkbox" value="${esc(f.ch)}" style="accent-color:#2563eb;width:auto;"> CH${esc(f.ch)} ${esc(f.purpose||'')}
+    </label>`).join('');
+  closeMo('lightMo');
+  document.getElementById('groupMo').classList.add('a');
+}
+function saveGroup() {
+  const s = gs(); if (!s) return;
+  const name = document.getElementById('grpName').value.trim();
+  if (!name) { t('请输入灯组名'); return; }
+  const chs = [];
+  document.querySelectorAll('#grpList input:checked').forEach(cb => chs.push(cb.value));
+  if (!chs.length) { t('请勾选至少一盏灯'); return; }
+  if (!s.groups) s.groups = [];
+  s.groups.push({ name, chs });
+  save(); closeMo('groupMo');
+  document.getElementById('lightMo').classList.add('a');
+  renderFixtures(); t('已建灯组 '+name);
+}
+function delGroup(gi) {
+  if (!confirm('删除此灯组？')) return;
+  gs().groups.splice(gi, 1);
+  save(); renderFixtures();
+}
+function fixtureOptsHTML(selectedCh) {
+  const s = gs(); const fix = s.fixtures || [];
+  if (!fix.length) return '<option value="">CH 未登记</option>';
+  return fix.map(f => `<option value="${esc(f.ch)}" ${selectedCh!==undefined && String(f.ch)===String(selectedCh)?'selected':''}>CH${esc(f.ch)} ${esc(f.purpose||'')}</option>`).join('');
+}
+function appendCueChangeRow(ch) {
+  const box = document.getElementById('cueChanges');
+  if (!box) return;
+  const row = document.createElement('div');
+  row.className = 'cue-change-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:5px;align-items:center;flex-wrap:wrap;';
+  row.innerHTML = `
+    <select class="cc-ch" style="max-width:110px;font-size:11px;padding:4px 6px;flex:1;">${fixtureOptsHTML(ch?ch.ch:undefined)}</select>
+    <span style="color:#555;font-size:11px;">→</span>
+    <input class="cc-level" type="number" min="0" max="100" placeholder="亮度%" value="${ch&&ch.level!==undefined?esc(ch.level):''}" style="max-width:70px;font-size:11px;padding:4px 6px;">
+    <input class="cc-fade" type="number" min="0" placeholder="变几秒" value="${ch&&ch.fade!==undefined?esc(ch.fade):''}" style="max-width:70px;font-size:11px;padding:4px 6px;">
+    <button class="tm-btn-sm" onclick="this.parentElement.remove()">✕</button>`;
+  box.appendChild(row);
+}
+function addGroupToCue(gname) {
+  const s = gs(); const g = (s.groups||[]).find(x => x.name === gname);
+  if (!g) return;
+  g.chs.forEach(ch => appendCueChangeRow({ ch }));
+}
+function addCueChangeRow() {
+  appendCueChangeRow();
 }
 
 function addFixture() {
