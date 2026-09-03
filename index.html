@@ -333,6 +333,7 @@
 <div id="hdr">
   <h1>🎭 工具包</h1>
   <div class="ha">
+    <button class="btn-g btn-sm" onclick="showHelp()">❓ 使用说明</button>
     <button class="btn-g btn-sm" onclick="showLicense()">📜 授权</button>
     <button class="btn-g btn-sm" onclick="showSettings()">⚙️</button>
     <button class="btn-g btn-sm" onclick="exportAll()">📤 导出</button>
@@ -876,6 +877,49 @@
     <div class="fa">
       <button class="btn-g" onclick="closeMo('propEditorMo')">取消</button>
       <button class="btn-p" onclick="saveProp()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div class="mo" id="helpMo">
+  <div class="md" style="max-width:680px;">
+    <h3>❓ 使用说明</h3>
+    <p style="color:#888;font-size:13px;margin-bottom:14px;">一个剧目 = 一张卡片。所有东西都从「我的剧目」开始。</p>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.7;">
+      <div style="background:#131313;border:1px solid #1a1a1a;border-radius:10px;padding:12px 14px;">
+        <div style="color:#6af;font-weight:600;margin-bottom:6px;">① 建剧目 / 导入剧本</div>
+        <div style="color:#ccc;">主页点「📄 上传剧本」或「✏️ 粘贴文本」或「📝 手动创建」→ 出现剧目卡片。<br>点卡片进入剧目页面。这时你已经可以做字幕了。</div>
+      </div>
+      <div style="background:#131313;border:1px solid #1a1a1a;border-radius:10px;padding:12px 14px;">
+        <div style="color:#6af;font-weight:600;margin-bottom:6px;">② 剧组排练数据（可选，用到哪个填哪个）</div>
+        <div style="color:#ccc;">剧目页分成几组按钮，每组一个用途：</div>
+        <div style="margin-top:6px;color:#ccc;background:#0d0d0d;border-radius:8px;padding:10px 12px;">
+          <div style="margin-bottom:4px;"><b style="color:#fdba74;">⚙️ 制作</b> —— 🎤麦克风 ｜ 💡灯光 ｜ 📦道具 ｜ 🔊音频</div>
+          <div style="margin-bottom:4px;"><b style="color:#fdba74;">📝 剧本</b> —— 🎭角色台词 ｜ 👥演员分配 ｜ 📄追加剧本 ｜ 🌐翻译</div>
+          <div style="margin-bottom:4px;"><b style="color:#fdba74;">💾 数据</b> —— 📤导出（数据备份 + 打印cue表都在这里）</div>
+        </div>
+        <div style="margin-top:6px;color:#aaa;font-size:12px;">每个模块打开后：<b style="color:#fff;">第一次用先点「＋ 添加」按钮</b>，空状态也会提示你第一步做什么。</div>
+      </div>
+      <div style="background:#131313;border:1px solid #1a1a1a;border-radius:10px;padding:12px 14px;">
+        <div style="color:#6af;font-weight:600;margin-bottom:6px;">③ 三种模式（演出组按钮）</div>
+        <div style="color:#ccc;">
+          <b style="color:#fff;">▶ 演出模式</b> — 观众看的大字幕（正式演出投屏用）<br>
+          <b style="color:#fff;">🎬 排演模式</b> — 排练时自己看：左边剧本，右边Mic/灯/道具/音频cue<br>
+          <b style="color:#fff;">🎛 控制面板</b> — 演出时舞台监督用：大字幕 + cue提示
+        </div>
+      </div>
+      <div style="background:#131313;border:1px solid #1a1a1a;border-radius:10px;padding:12px 14px;">
+        <div style="color:#6af;font-weight:600;margin-bottom:6px;">④ 灯光模块的三个tab怎么用</div>
+        <div style="color:#ccc;">
+          <b style="color:#fff;">💡 灯具</b> — 先登记舞台上的灯（channel+位置+颜色），登记几盏即可<br>
+          <b style="color:#fff;">🎨 Magic Sheet</b> — 自动画出舞台灯位图，排练贴台子上给操作的人看<br>
+          <b style="color:#fff;">📋 Cue表</b> — 记录灯光变化：哪个场景、什么效果、谁操作
+        </div>
+      </div>
+    </div>
+    <div class="fa" style="margin-top:16px;">
+      <button class="btn-g" onclick="closeMo('helpMo')">知道了</button>
     </div>
   </div>
 </div>
@@ -2421,6 +2465,10 @@ async function showTranslateAll() {
 // ====================================================================
 //  SETTINGS / LOCAL TRANSLATION
 // ====================================================================
+function showHelp() {
+  document.getElementById('helpMo').classList.add('a');
+}
+
 function showLicense() {
   document.getElementById('licenseMo').classList.add('a');
 }
