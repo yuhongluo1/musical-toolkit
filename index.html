@@ -555,7 +555,22 @@
     <span style="flex:1;color:#fff;font-size:14px;" id="sceneLabel"></span>
     <span id="sceneLineStats" style="color:#555;font-size:12px;"></span>
     <input id="lineSearch" placeholder="🔍 搜索" style="max-width:130px;" oninput="renderLines()">
-    <button class="btn-s btn-sm" onclick="openLineEditor(-1)">＋添加</button>
+    <button class="btn-s btn-sm" onclick="openLineEditor(-1)">＋添加台词</button>
+  </div>
+  <!-- CUE BAR: attach mic/light/prop/audio to THIS scene -->
+  <div style="background:#111;border:1px solid #1a1a1a;border-radius:10px;padding:10px 14px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <span style="color:#888;font-size:12px;font-weight:600;">📌 本段cue</span>
+      <span style="color:#555;font-size:11px;">把灯光/Mic/道具/音频挂到这段剧本上</span>
+      <div style="flex:1;"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      <button class="btn-g btn-sm" onclick="sceneAddMic()" style="padding:4px 10px;">🎤 Mic ＋</button>
+      <button class="btn-g btn-sm" onclick="sceneAddLight()" style="padding:4px 10px;">💡 灯Cue ＋</button>
+      <button class="btn-g btn-sm" onclick="sceneAddProp()" style="padding:4px 10px;">📦 道具 ＋</button>
+      <button class="btn-g btn-sm" onclick="sceneAddAudio()" style="padding:4px 10px;">🔊 音频 ＋</button>
+    </div>
+    <div id="sceneCueList" style="margin-top:8px;display:flex;flex-direction:column;gap:3px;"></div>
   </div>
   <div id="linesContainer"></div>
 </div>
@@ -784,6 +799,9 @@
   <div class="md" style="max-width:480px;">
     <h3>绑定音频Cue</h3>
     <p style="color:#888;font-size:13px;margin-bottom:10px;" id="acTrackName"></p>
+    <div class="fg"><label>音轨</label>
+      <select id="acTrack" style="font-size:12px;padding:6px 10px;" onchange="document.getElementById('acTrackName').textContent='音轨: '+this.options[this.selectedIndex].text"></select>
+    </div>
     <div class="fg"><label>绑定到场景</label>
       <select id="acScene" style="font-size:12px;padding:6px 10px;"></select>
     </div>
@@ -1803,6 +1821,87 @@ function openScene(ai, si) {
   document.getElementById('sceneLabel').textContent = `${gs().acts[ai].name} → ${sc.name} (${sc.type==='song'?'🎵':'🎭'})`;
   document.getElementById('lineSearch').value = '';
   renderLines();
+  renderSceneCueList();
+  sceneBindMode = false;
+}
+
+function renderSceneCueList() {
+  const s = gs(); if (!s) return;
+  const el = document.getElementById('sceneCueList');
+  if (!el) return;
+  const sceneKey = `${curAct}-${curScene}`;
+  const sk = sceneKey;
+  // Find the scene name for display
+  const lines = [];
+  // Mic
+  const micAssign = (s.mics?.assignments||[]).filter(a => a.sceneKey === sk);
+  // Light cues
+  const lightCues = (s.lightingCues||[]).filter(c => c.sceneKey === sk);
+  // Prop cues for this scene
+  const propCues = (s.props||[]).filter(p => (p.sceneCues||[]).some(c => c.sceneKey === sk));
+  // Audio
+  const audioCues = (s.audioCues||[]).filter(c => c.sceneKey === sk);
+
+  const cnt = micAssign.length + lightCues.length + propCues.length + audioCues.length;
+  if (!cnt) { el.innerHTML = '<div style="color:#444;font-size:12px;">这段还没有挂cue，点上面按钮添加 👆</div>'; return; }
+
+  let h = '';
+  if (micAssign.length) h += `<div style="font-size:12px;color:#aaa;">🎤 ${micAssign.map(a => `<b style="color:#fdba74;">${esc(a.micId)}</b>→${esc(a.actor)}`).join('，')}</div>`;
+  if (lightCues.length) h += `<div style="font-size:12px;color:#aaa;">💡 ${lightCues.map(c => `<b style="color:#a78bfa;">${esc(c.number)}</b> ${esc(c.desc)}`).join('，')}</div>`;
+  if (propCues.length) h += `<div style="font-size:12px;color:#aaa;">📦 ${propCues.map(p => { const cue = (p.sceneCues||[]).find(c => c.sceneKey===sk); return `<b style="color:#fff;">${esc(p.name)}</b>${cue?.onTime?' ↑'+esc(cue.onTime):''}${cue?.offTime?' ↓'+esc(cue.offTime):''}`; }).join('，')}</div>`;
+  if (audioCues.length) h += `<div style="font-size:12px;color:#aaa;">🔊 ${audioCues.map(c => { const t = (s.audioTracks||[]).find(x => x.id===c.trackId); return `<b style="color:#6ee7b7;">${esc(t?.name||'?')}</b>`; }).join('，')}</div>`;
+  el.innerHTML = h;
+}
+
+// Add-cue entry points from the scene page, pre-bound to the current scene
+function sceneAddMic() {
+  const s = gs(); const sceneKey = `${curAct}-${curScene}`;
+  if (!(s.mics?.inventory||[]).length) { t('还没有Mic设备，去🎤麦克风添加'); return; }
+  sceneBindMode = true;
+  addMicAssign(sceneKey);
+}
+function sceneAddLight() {
+  const sceneKey = `${curAct}-${curScene}`;
+  sceneBindMode = true;
+  addLightCue(); // opens editor for new cue
+  // Pre-select current scene in the dropdown
+  const sel = document.getElementById('cueScene');
+  sel.value = sceneKey;
+}
+function sceneAddProp() {
+  const sceneKey = `${curAct}-${curScene}`;
+  showPropManager();
+  // Pre-filter prop list to this scene
+  const sel = document.getElementById('propSceneFilter');
+  if (sel) { sel.value = sceneKey; renderProps(); }
+}
+function sceneAddAudio() {
+  const s = gs();
+  if (!(s.audioTracks||[]).length) { t('还没有音轨，先去🔊音频上传MP3'); return; }
+  const sceneKey = `${curAct}-${curScene}`;
+  sceneBindMode = true;
+  // Populate track select with all tracks
+  const tsel = document.getElementById('acTrack');
+  tsel.innerHTML = '';
+  s.audioTracks.forEach((tr, i) => { tsel.innerHTML += `<option value="${i}">${esc(tr.name||'')}</option>`; });
+  editingAudioTrackIdx = tsel.value ? parseInt(tsel.value) : 0;
+  const name = s.audioTracks[editingAudioTrackIdx]?.name || '';
+  // Populate scene select and preset to current scene
+  const sel = document.getElementById('acScene');
+  sel.innerHTML = '';
+  s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => {
+    sel.innerHTML += `<option value="${ai}-${si}">${esc(act.name)} → ${esc(sc.name)}</option>`;
+  }));
+  sel.value = sceneKey;
+  document.getElementById('acTrackName').textContent = '音轨: ' + name;
+  document.getElementById('acOffsetMin').value = '0';
+  document.getElementById('acOffsetSec').value = '00';
+  document.getElementById('acNote').value = '';
+  closeMo('audioMo');
+  document.getElementById('audioCueMo').classList.add('a');
+}
+function sceneEditCues() {
+  document.getElementById('lightMo').classList.add('a'); renderLightCues();
 }
 
 function renderLines() {
@@ -2875,6 +2974,7 @@ load(); renderHome();
 let editingMicIdx = -1;
 let editingAssignSceneKey = '';
 let editingAudioTrackIdx = -1;
+let sceneBindMode = false; // true when adding cue from the scene page
 
 function addMic() {
   editingMicIdx = -1;
@@ -3021,8 +3121,8 @@ function saveMicAssign() {
   s.mics.assignments = s.mics.assignments.filter(a => !(a.sceneKey === editingAssignSceneKey && a.micId === micId));
   s.mics.assignments.push({ sceneKey: editingAssignSceneKey, micId, actor, character, note });
   save(); closeMo('micAssignMo');
-  document.getElementById('micMo').classList.add('a');
-  renderMicAssign(); t('已分配');
+  if (sceneBindMode) { sceneBindMode = false; renderSceneCueList(); t('已挂到本段'); }
+  else { document.getElementById('micMo').classList.add('a'); renderMicAssign(); t('已分配'); }
 }
 
 function renderMicAssign() {
@@ -3168,9 +3268,20 @@ function renderLightCues() {
   container.innerHTML = html;
 }
 
+function populateCueSceneSelect() {
+  const s = gs(); if (!s) return;
+  const sel = document.getElementById('cueScene');
+  if (!sel) return;
+  sel.innerHTML = '';
+  s.acts.forEach((act, ai) => act.scenes.forEach((sc, si) => {
+    sel.innerHTML += `<option value="${ai}-${si}">${esc(act.name)} → ${esc(sc.name)}</option>`;
+  }));
+}
+
 function addLightCue() {
   editingCueIdx = -1; const s = gs();
   document.getElementById('cueEditorTitle').textContent = '➕ 添加Cue';
+  populateCueSceneSelect();
   document.getElementById('cueNum').value = `L${(s.lightingCues||[]).length+1}`;
   document.getElementById('cueType').value = 'lighting'; document.getElementById('cueDesc').value = '';
   document.getElementById('cueTiming').value = 'scene_start'; document.getElementById('cueOperator').value = '';
@@ -3180,6 +3291,7 @@ function addLightCue() {
 function editLightCue(idx) {
   const s = gs(); const c = s.lightingCues[idx]; if (!c) return;
   editingCueIdx = idx; document.getElementById('cueEditorTitle').textContent = '✏️ 编辑Cue';
+  populateCueSceneSelect();
   document.getElementById('cueNum').value = c.number||''; document.getElementById('cueType').value = c.type||'lighting';
   document.getElementById('cueDesc').value = c.desc||''; document.getElementById('cueScene').value = c.sceneKey||'';
   document.getElementById('cueTiming').value = c.timing||'scene_start'; document.getElementById('cueOperator').value = c.operator||'';
@@ -3200,7 +3312,9 @@ function saveLightCue() {
   if (!s.lightingCues) s.lightingCues = [];
   if (editingCueIdx >= 0) { cueData.seq = s.lightingCues[editingCueIdx].seq; s.lightingCues[editingCueIdx] = cueData; }
   else s.lightingCues.push(cueData);
-  save(); closeMo('cueEditorMo'); document.getElementById('lightMo').classList.add('a'); renderLightCues(); t('已保存Cue');
+  save(); closeMo('cueEditorMo');
+  if (sceneBindMode) { sceneBindMode = false; renderSceneCueList(); t('Cue已挂到本段'); }
+  else { document.getElementById('lightMo').classList.add('a'); renderLightCues(); t('已保存Cue'); }
 }
 function delLightCue(idx) { if (!confirm('删除此Cue？')) return; gs().lightingCues.splice(idx,1); save(); renderLightCues(); }
 
@@ -3873,6 +3987,11 @@ async function delAudioTrack(idx) {
 function addAudioCueFromTrack(trackIdx) {
   const s=gs(); const t=s.audioTracks[trackIdx]; if(!t) return;
   editingAudioTrackIdx = trackIdx;
+  // Populate track select
+  const tsel = document.getElementById('acTrack');
+  tsel.innerHTML = '';
+  s.audioTracks.forEach((tr, i) => { tsel.innerHTML += `<option value="${i}">${esc(tr.name||'')}</option>`; });
+  tsel.value = trackIdx;
   // Populate scene selector
   const sel = document.getElementById('acScene');
   sel.innerHTML = '';
@@ -3890,7 +4009,9 @@ function addAudioCueFromTrack(trackIdx) {
 
 function saveAudioCue() {
   const s=gs(); if(!s) return;
-  const t=s.audioTracks[editingAudioTrackIdx]; if(!t) return;
+  const trackSel = document.getElementById('acTrack');
+  const trackIdx = trackSel && trackSel.value !== '' ? parseInt(trackSel.value) : editingAudioTrackIdx;
+  const t=s.audioTracks[trackIdx]; if(!t) { t('请选择音轨'); return; }
   const sceneKey = document.getElementById('acScene').value;
   const min = parseInt(document.getElementById('acOffsetMin').value)||0;
   const sec = parseInt(document.getElementById('acOffsetSec').value)||0;
@@ -3899,8 +4020,8 @@ function saveAudioCue() {
   if(!s.audioCues)s.audioCues=[];
   s.audioCues.push({id:'AC'+Date.now(),trackId:t.id,sceneKey, timing:'scene_start', offset, note});
   save(); closeMo('audioCueMo');
-  document.getElementById('audioMo').classList.add('a');
-  setAudioView('cues'); t('已绑定Cue');
+  if (sceneBindMode) { sceneBindMode = false; renderSceneCueList(); t('音频已挂到本段'); }
+  else { document.getElementById('audioMo').classList.add('a'); setAudioView('cues'); t('已绑定Cue'); }
 }
 
 function editAudioCue(idx){const s=gs();const c=s.audioCues[idx];if(!c)return;const n=prompt('备注：',c.note||'');if(n===null)return;c.note=n;save();renderAudioView();}
